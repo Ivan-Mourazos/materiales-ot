@@ -251,6 +251,16 @@ const server = app.listen(config.port, () => {
   console.log(`Reserva de materiales disponible en http://localhost:${config.port}`);
 });
 
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`\n✗ El puerto ${config.port} ya está en uso.`);
+    console.error(`  Cierra la instancia anterior o cambia PORT en .env\n`);
+  } else {
+    console.error('\n✗ Error al iniciar el servidor:', error.message, '\n');
+  }
+  process.exit(1);
+});
+
 async function shutdown() {
   server.close(async () => {
     await closeDatabase();
@@ -427,25 +437,50 @@ function isWindowsUncPath(value) {
   return typeof value === 'string' && /^\\\\[^\\]+\\[^\\]+/.test(value.trim());
 }
 
+function serveDistFolder() {
+  // Los assets de Vite llevan hash en el nombre: caché larga e inmutable.
+  app.use(express.static(distDir, { index: false, maxAge: '1y', immutable: true }));
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && req.accepts('html')) {
+      res.set('Cache-Control', 'no-cache');
+      res.sendFile(path.join(distDir, 'index.html'));
+      return;
+    }
+    next();
+  });
+}
+
 async function configureFrontend() {
   if (isProduction) {
-    // Los assets de Vite llevan hash en el nombre: caché larga e inmutable.
-    app.use(express.static(distDir, { index: false, maxAge: '1y', immutable: true }));
-    app.use((req, res, next) => {
-      if (req.method === 'GET' && req.accepts('html')) {
-        res.set('Cache-Control', 'no-cache');
-        res.sendFile(path.join(distDir, 'index.html'));
-        return;
-      }
-      next();
-    });
+    serveDistFolder();
     return;
   }
 
-  const { createServer } = await import('vite');
-  const vite = await createServer({
-    server: { middlewareMode: true },
-    appType: 'spa'
-  });
-  app.use(vite.middlewares);
+  // Modo dev: intentar Vite en middleware mode. Si no está disponible
+  // (p. ej. devDependencies no instaladas en el servidor) usamos dist/ como
+  // fallback para que la web funcione igualmente.
+  try {
+    const { createServer } = await import('vite');
+    const vite = await createServer({
+      server: { middlewareMode: true },
+      appType: 'spa'
+    });
+    app.use(vite.middlewares);
+    console.log('  Modo: desarrollo (Vite HMR activo)');
+  } catch (error) {
+    const distIndex = path.join(distDir, 'index.html');
+    const hasDist = await fs.access(distIndex).then(() => true, () => false);
+
+    if (!hasDist) {
+      console.error('\n✗ No se puede arrancar Vite y no hay carpeta dist/ compilada.');
+      console.error('  Ejecuta primero: pnpm build');
+      console.error('  O arranca con: NODE_ENV=production node src/server.js\n');
+      process.exit(1);
+    }
+
+    console.warn('\n⚠ Vite no disponible — sirviendo dist/ compilado.');
+    console.warn('  Para desarrollo con HMR instala las devDependencies: pnpm install');
+    console.warn('  Para suprimir este aviso usa: NODE_ENV=production node src/server.js\n');
+    serveDistFolder();
+  }
 }
