@@ -115,6 +115,19 @@ type CatalogFilterState = {
   includeOmitted: boolean;
 };
 
+function uid() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback para contextos no seguros (HTTP sin localhost)
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
+
 const storageKey = 'materiales-ot-state-v3';
 const themeStorageKey = 'materiales-ot-theme';
 const technicalTerms = new Set([
@@ -222,7 +235,7 @@ function useToasts() {
   }, []);
 
   const pushToast = useCallback((text: string, type: ToastType = 'info', action?: ToastAction) => {
-    const id = crypto.randomUUID();
+    const id = uid();
     setToasts((current) => [...current.slice(-3), { id, text, type, action }]);
     const ttl = action ? 7000 : type === 'error' ? 6500 : 4200;
     window.setTimeout(() => dismissToast(id), ttl);
@@ -372,7 +385,7 @@ function App() {
           materials: [
             ...ofBlock.materials,
             {
-              id: crypto.randomUUID(),
+              id: uid(),
               code,
               description: article.description || '',
               quantity: roundQuantity(quantity),
@@ -422,7 +435,7 @@ function App() {
           );
         }
 
-        return [...current, { id: crypto.randomUUID(), of, materials: [material] }];
+        return [...current, { id: uid(), of, materials: [material] }];
       }
 
       return current.map((ofBlock) => {
@@ -1738,7 +1751,7 @@ function QuantityCell({ line, onCommit }: { line: MaterialLine; onCommit: (quant
 
 function createOf(): OfBlock {
   return {
-    id: crypto.randomUUID(),
+    id: uid(),
     of: '',
     materials: []
   };
@@ -1746,7 +1759,7 @@ function createOf(): OfBlock {
 
 function buildMaterialLine(article: Article, quantity: number): MaterialLine {
   return {
-    id: crypto.randomUUID(),
+    id: uid(),
     code: String(article.code || '').trim().toUpperCase(),
     description: article.description || '',
     quantity: roundQuantity(quantity),
