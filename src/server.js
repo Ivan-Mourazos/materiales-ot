@@ -18,11 +18,18 @@ app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', async (_req, res, next) => {
   try {
+    const exportPath = getPathStatus(config.exportDirectory);
+    const orderArchivePath = getPathStatus(config.orderArchiveRoot);
+
     res.json({
       ok: true,
       database: await checkDatabase(),
-      networkSave: Boolean(config.exportDirectory),
-      orderArchive: Boolean(config.orderArchiveRoot)
+      networkSave: exportPath.configured && exportPath.valid,
+      orderArchive: orderArchivePath.configured && orderArchivePath.valid,
+      paths: {
+        exportDirectory: exportPath,
+        orderArchiveRoot: orderArchivePath
+      }
     });
   } catch (error) {
     next(error);
@@ -89,6 +96,12 @@ app.post('/api/export/save', async (req, res, next) => {
       res.status(400).json({
         error: 'No hay carpeta de guardado configurada. Define EXPORT_DIRECTORY en .env.'
       });
+      return;
+    }
+
+    const exportPath = getPathStatus(config.exportDirectory);
+    if (!exportPath.valid) {
+      res.status(400).json({ error: exportPath.message });
       return;
     }
 
@@ -207,6 +220,11 @@ async function saveOrderArchiveIfNeeded(reservation) {
     return null;
   }
 
+  const orderArchivePath = getPathStatus(config.orderArchiveRoot);
+  if (!orderArchivePath.valid) {
+    throw new Error(orderArchivePath.message);
+  }
+
   const archivePath = buildOrderArchivePath(reservation.orderCode);
   await fs.mkdir(path.dirname(archivePath), { recursive: true });
 
@@ -247,6 +265,26 @@ function getOrderYear(orderCode) {
   const match = /^[A-Z]+(\d{2})/.exec(orderCode);
   if (!match) return null;
   return 2000 + Number(match[1]);
+}
+
+function getPathStatus(value) {
+  const configured = Boolean(value);
+  const isUnc = isWindowsUncPath(value);
+  const valid = !configured || process.platform === 'win32' || !isUnc;
+
+  return {
+    configured,
+    valid,
+    platform: process.platform,
+    type: isUnc ? 'windows-unc' : configured ? 'local-or-mounted' : 'empty',
+    message: valid
+      ? null
+      : 'Ruta de red Windows configurada en Linux. Monta la carpeta SMB/CIFS en el servidor y usa esa ruta local en .env.'
+  };
+}
+
+function isWindowsUncPath(value) {
+  return typeof value === 'string' && /^\\\\[^\\]+\\[^\\]+/.test(value.trim());
 }
 
 async function configureFrontend() {
