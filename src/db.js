@@ -3,6 +3,24 @@ import { config } from './config.js';
 
 let poolPromise;
 
+const excludedCatalogFamilies = [
+  'OFICINA',
+  'PERSONAL',
+  'SERVICIOS DIVERSOS. FACTURAS DIRECTAS',
+  'HERRAMIENTAS',
+  'INFORMATICA',
+  'REPARACION Y MANTENIMIENTO (COMPRAS)',
+  'MAQUINARIA',
+  'VEHICULOS',
+  'PROVISIONAL',
+  'PORTES',
+  'PUBLICIDAD  EN DIRECTORIOS, PRENSA, RADIO Y ESCRIT',
+  'REGALOS',
+  'SUSCRIPCION REVISTAS, WEBS, ETC.',
+  'TRABAJOS CLIENTES',
+  'GAS'
+];
+
 function getPool() {
   if (!poolPromise) {
     poolPromise = sql.connect({
@@ -65,6 +83,24 @@ function addTokenInputs(request, tokens) {
   tokens.forEach((token, index) => {
     request.input(`token${index}`, sql.VarChar(80), `%${escapeLike(token)}%`);
   });
+}
+
+function addCatalogExclusionInputs(request) {
+  excludedCatalogFamilies.forEach((family, index) => {
+    request.input(`excludedFamily${index}`, sql.NVarChar(255), family);
+  });
+}
+
+function buildCatalogExclusionCondition() {
+  const families = excludedCatalogFamilies
+    .map((_, index) => `@excludedFamily${index}`)
+    .join(', ');
+
+  return `
+    NULLIF(LTRIM(RTRIM(pf.Description)), '') IS NOT NULL
+    AND pf.Description NOT IN (${families})
+    AND pf.Description NOT LIKE '%(VENTAS)%'
+  `;
 }
 
 function buildTokenConditions(searchableText, tokens) {
@@ -166,9 +202,11 @@ export async function searchArticles({ query = '', limit = 25 }) {
   request.input('like', sql.VarChar(260), like);
   request.input('prefix', sql.VarChar(260), prefix);
   addTokenInputs(request, tokens);
+  addCatalogExclusionInputs(request);
 
   const searchableText = getSearchableText();
   const tokenConditions = buildTokenConditions(searchableText, tokens);
+  const catalogExclusionCondition = buildCatalogExclusionCondition();
   const tokenScore = tokens.length
     ? tokens
       .map((_, index) => `CASE WHEN a.CodArticle COLLATE Latin1_General_CI_AI LIKE @token${index} ESCAPE '\\' THEN 4 ELSE 0 END`)
@@ -218,6 +256,7 @@ export async function searchArticles({ query = '', limit = 25 }) {
     ) detail
     WHERE a.CodCompany = @company
       AND (a.InactiveDate IS NULL OR a.InactiveDate > GETDATE())
+      AND (${catalogExclusionCondition})
       AND (
         LEN(@q) = 0
         OR a.CodArticle COLLATE Latin1_General_CI_AI LIKE @like ESCAPE '\\'
@@ -250,6 +289,7 @@ export async function listArticles({
   productionSection = '',
   active = 'true',
   hideBlocked = 'false',
+  includeOmitted = 'false',
   limit = 100
 }) {
   const q = String(query).trim();
@@ -269,10 +309,13 @@ export async function listArticles({
   request.input('productionSection', sql.NVarChar(255), String(productionSection || '').trim());
   request.input('activeOnly', sql.Bit, String(active) !== 'false');
   request.input('hideBlocked', sql.Bit, String(hideBlocked) === 'true');
+  request.input('includeOmitted', sql.Bit, String(includeOmitted) === 'true');
   addTokenInputs(request, tokens);
+  addCatalogExclusionInputs(request);
 
   const searchableText = getSearchableText();
   const tokenConditions = buildTokenConditions(searchableText, tokens);
+  const catalogExclusionCondition = buildCatalogExclusionCondition();
 
   const result = await request.query(`
     SELECT TOP (@limit)
@@ -321,6 +364,7 @@ export async function listArticles({
       AND (@subfamily = '' OR psf.Description = @subfamily)
       AND (@unit = '' OR mu.CodMeasureUnit = @unit)
       AND (@productionSection = '' OR c.SeccionDeProduccion = @productionSection)
+      AND (@includeOmitted = 1 OR (${catalogExclusionCondition}))
       AND (
         @hideBlocked = 0
         OR (
@@ -346,10 +390,15 @@ export async function listArticles({
   return result.recordset.map(mapArticle);
 }
 
-export async function listArticleFilters() {
+export async function listArticleFilters({ family = '', subfamily = '', includeOmitted = 'false' } = {}) {
   const pool = await getPool();
   const request = pool.request();
   request.input('company', sql.VarChar(10), config.db.company);
+  request.input('family', sql.NVarChar(255), String(family || '').trim());
+  request.input('subfamily', sql.NVarChar(255), String(subfamily || '').trim());
+  request.input('includeOmitted', sql.Bit, String(includeOmitted) === 'true');
+  addCatalogExclusionInputs(request);
+  const catalogExclusionCondition = buildCatalogExclusionCondition();
 
   const result = await request.query(`
     SELECT 'family' AS type, pf.Description AS value
@@ -357,44 +406,72 @@ export async function listArticleFilters() {
     LEFT JOIN dbo.GENProductFamily pf
       ON pf.IDProductFamily = a.IDProductFamily
       AND pf.CodCompany = a.CodCompany
+    LEFT JOIN dbo.GENProductSubFamily psf
+      ON psf.IDProductSubFamily = a.IDProductSubFamily
+      AND psf.CodCompany = a.CodCompany
     WHERE a.CodCompany = @company
       AND (a.InactiveDate IS NULL OR a.InactiveDate > GETDATE())
       AND NULLIF(LTRIM(RTRIM(pf.Description)), '') IS NOT NULL
+      AND (@subfamily = '' OR psf.Description = @subfamily)
+      AND (@includeOmitted = 1 OR (${catalogExclusionCondition}))
     GROUP BY pf.Description
 
     UNION ALL
 
     SELECT 'subfamily' AS type, psf.Description AS value
     FROM dbo.STKArticle a
+    LEFT JOIN dbo.GENProductFamily pf
+      ON pf.IDProductFamily = a.IDProductFamily
+      AND pf.CodCompany = a.CodCompany
     LEFT JOIN dbo.GENProductSubFamily psf
       ON psf.IDProductSubFamily = a.IDProductSubFamily
       AND psf.CodCompany = a.CodCompany
     WHERE a.CodCompany = @company
       AND (a.InactiveDate IS NULL OR a.InactiveDate > GETDATE())
       AND NULLIF(LTRIM(RTRIM(psf.Description)), '') IS NOT NULL
+      AND (@family = '' OR pf.Description = @family)
+      AND (@includeOmitted = 1 OR (${catalogExclusionCondition}))
     GROUP BY psf.Description
 
     UNION ALL
 
     SELECT 'unit' AS type, mu.CodMeasureUnit AS value
     FROM dbo.STKArticle a
+    LEFT JOIN dbo.GENProductFamily pf
+      ON pf.IDProductFamily = a.IDProductFamily
+      AND pf.CodCompany = a.CodCompany
     LEFT JOIN dbo.GENMeasureUnit mu
       ON mu.IDMeasureUnit = a.IDUnitQuantityWarehouse
       AND mu.CodCompany = a.CodCompany
+    LEFT JOIN dbo.GENProductSubFamily psf
+      ON psf.IDProductSubFamily = a.IDProductSubFamily
+      AND psf.CodCompany = a.CodCompany
     WHERE a.CodCompany = @company
       AND (a.InactiveDate IS NULL OR a.InactiveDate > GETDATE())
       AND NULLIF(LTRIM(RTRIM(mu.CodMeasureUnit)), '') IS NOT NULL
+      AND (@family = '' OR pf.Description = @family)
+      AND (@subfamily = '' OR psf.Description = @subfamily)
+      AND (@includeOmitted = 1 OR (${catalogExclusionCondition}))
     GROUP BY mu.CodMeasureUnit
 
     UNION ALL
 
     SELECT 'productionSection' AS type, c.SeccionDeProduccion AS value
     FROM dbo.STKArticle a
+    LEFT JOIN dbo.GENProductFamily pf
+      ON pf.IDProductFamily = a.IDProductFamily
+      AND pf.CodCompany = a.CodCompany
     LEFT JOIN dbo._STKArticle_Custom c
       ON c.IDArticle = a.IDArticle
+    LEFT JOIN dbo.GENProductSubFamily psf
+      ON psf.IDProductSubFamily = a.IDProductSubFamily
+      AND psf.CodCompany = a.CodCompany
     WHERE a.CodCompany = @company
       AND (a.InactiveDate IS NULL OR a.InactiveDate > GETDATE())
       AND NULLIF(LTRIM(RTRIM(c.SeccionDeProduccion)), '') IS NOT NULL
+      AND (@family = '' OR pf.Description = @family)
+      AND (@subfamily = '' OR psf.Description = @subfamily)
+      AND (@includeOmitted = 1 OR (${catalogExclusionCondition}))
     GROUP BY c.SeccionDeProduccion
     ORDER BY type, value;
   `);

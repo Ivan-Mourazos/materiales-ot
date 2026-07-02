@@ -1,19 +1,19 @@
 export function normalizeReservation(payload) {
   if (!payload || typeof payload !== 'object') {
-    throw new Error('La solicitud no tiene formato valido.');
+    throw new Error('La solicitud no tiene formato válido.');
   }
 
   const orderCode = cleanText(payload.orderCode || payload.pedido || '');
   const ofs = Array.isArray(payload.ofs) ? payload.ofs : [];
 
   if (ofs.length === 0) {
-    throw new Error('Anade al menos una OF.');
+    throw new Error('Añade al menos una OF.');
   }
 
   const normalizedOfs = ofs.map((ofBlock, index) => {
     const of = cleanText(ofBlock?.of);
     if (!of) {
-      throw new Error(`La OF ${index + 1} no tiene numero.`);
+      throw new Error(`La OF ${index + 1} no tiene número.`);
     }
 
     const materials = Array.isArray(ofBlock?.materials) ? ofBlock.materials : [];
@@ -24,7 +24,7 @@ export function normalizeReservation(payload) {
         const quantity = Number(line?.quantity);
 
         if (!code && !description && !quantity) return null;
-        if (!code) throw new Error(`Hay una linea sin articulo en la OF ${of}.`);
+        if (!code) throw new Error(`Hay una línea sin artículo en la OF ${of}.`);
         if (!Number.isFinite(quantity) || quantity <= 0) {
           throw new Error(`La cantidad de ${code} en la OF ${of} debe ser mayor que cero.`);
         }

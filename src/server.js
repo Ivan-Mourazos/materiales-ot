@@ -48,9 +48,15 @@ app.get('/api/articles', async (req, res, next) => {
   }
 });
 
-app.get('/api/article-filters', async (_req, res, next) => {
+app.get('/api/article-filters', async (req, res, next) => {
   try {
-    res.json({ filters: await listArticleFilters() });
+    res.json({
+      filters: await listArticleFilters({
+        family: req.query.family || '',
+        subfamily: req.query.subfamily || '',
+        includeOmitted: req.query.includeOmitted || 'false'
+      })
+    });
   } catch (error) {
     next(error);
   }
@@ -66,6 +72,7 @@ app.get('/api/article-list', async (req, res, next) => {
       productionSection: req.query.productionSection || '',
       active: req.query.active || 'true',
       hideBlocked: req.query.hideBlocked || 'false',
+      includeOmitted: req.query.includeOmitted || 'false',
       limit: req.query.limit || 120
     });
     res.json({ articles });
@@ -157,7 +164,7 @@ app.use((error, _req, res, _next) => {
   }
 
   res.status(status).json({
-    error: status === 500 ? 'No se pudo completar la operacion.' : error.message
+    error: status === 500 ? 'No se pudo completar la operación.' : error.message
   });
 });
 
@@ -194,7 +201,7 @@ function sanitizeOf(value) {
     .replace(/[^a-z0-9_-]+/gi, '');
 
   if (!clean) {
-    throw new Error('Hay una OF sin numero valido.');
+    throw new Error('Hay una OF sin número válido.');
   }
 
   return clean.slice(0, 80);
@@ -242,7 +249,7 @@ function buildOrderArchivePath(orderCode) {
   const year = getOrderYear(cleanOrder);
 
   if (!year) {
-    throw new Error('No pude determinar el año desde el numero de pedido.');
+    throw new Error('No pude determinar el año desde el número de pedido.');
   }
 
   return path.join(config.orderArchiveRoot, String(year), `M.${cleanOrder}.xlsx`);
@@ -255,7 +262,7 @@ function sanitizeOrderCode(value) {
     .replace(/[^A-Z0-9_-]+/g, '');
 
   if (!clean) {
-    throw new Error('El numero de pedido no es valido.');
+    throw new Error('El número de pedido no es válido.');
   }
 
   return clean.slice(0, 80);

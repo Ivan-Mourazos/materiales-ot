@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import {
   AlertTriangle,
   Boxes,
+  Check,
+  ChevronDown,
   Database,
   FileSpreadsheet,
   Loader2,
@@ -77,9 +79,64 @@ type CatalogFilterState = {
   productionSection: string;
   active: boolean;
   hideBlocked: boolean;
+  includeOmitted: boolean;
 };
 
-const storageKey = 'materiales-ot-state-v2';
+const storageKey = 'materiales-ot-state-v3';
+const technicalTerms = new Set([
+  'BD',
+  'ID',
+  'OF',
+  'PVC',
+  'RPS',
+  'SAT',
+  'TGM',
+  'UNE',
+  'UPN',
+  'UV'
+]);
+const lowerCaseWords = new Set(['a', 'con', 'de', 'del', 'e', 'el', 'en', 'la', 'las', 'los', 'o', 'para', 'por', 'sin', 'u', 'y']);
+const wordCorrections: Record<string, string> = {
+  acidos: 'ácidos',
+  acrilico: 'acrílico',
+  acrilicos: 'acrílicos',
+  agricola: 'agrícola',
+  anodizado: 'anodizado',
+  aplicacion: 'aplicación',
+  automatizacion: 'automatización',
+  caldereria: 'calderería',
+  cerrajeria: 'cerrajería',
+  clasificacion: 'clasificación',
+  conexion: 'conexión',
+  confeccion: 'confección',
+  decoracion: 'decoración',
+  descripcion: 'descripción',
+  electrico: 'eléctrico',
+  electricos: 'eléctricos',
+  elevacion: 'elevación',
+  fijacion: 'fijación',
+  fotografico: 'fotográfico',
+  impresion: 'impresión',
+  informatica: 'informática',
+  linea: 'línea',
+  lineas: 'líneas',
+  maquinas: 'máquinas',
+  metalicos: 'metálicos',
+  motorizacion: 'motorización',
+  plasticos: 'plásticos',
+  plastica: 'plástica',
+  poliester: 'poliéster',
+  proteccion: 'protección',
+  quimicos: 'químicos',
+  reparacion: 'reparación',
+  rotulacion: 'rotulación',
+  seccion: 'sección',
+  sujecion: 'sujeción',
+  tornilleria: 'tornillería',
+  utiles: 'útiles',
+  vehiculos: 'vehículos',
+  vinilica: 'vinílica'
+};
 const defaultCatalogFilters: CatalogFilterState = {
   q: '',
   family: '',
@@ -87,7 +144,8 @@ const defaultCatalogFilters: CatalogFilterState = {
   unit: '',
   productionSection: '',
   active: true,
-  hideBlocked: false
+  hideBlocked: true,
+  includeOmitted: false
 };
 
 function App() {
@@ -163,7 +221,7 @@ function App() {
   function addLine(ofId: string, article: Article, quantity: number) {
     const code = String(article.code || '').trim().toUpperCase();
     if (!code) {
-      setMessage({ text: 'Selecciona o escribe un articulo.', type: 'error' });
+      setMessage({ text: 'Selecciona o escribe un artículo.', type: 'error' });
       return;
     }
 
@@ -205,9 +263,69 @@ function App() {
       })
     );
     setMessage({
-      text: article.widthWarning ? `Linea anadida. Aviso: ${article.widthWarning}` : 'Linea anadida.',
+      text: article.widthWarning ? `Línea añadida. Aviso: ${article.widthWarning}` : 'Línea añadida.',
       type: article.widthWarning ? 'error' : 'ok'
     });
+  }
+
+  function addLineByOfValue(ofValue: string, article: Article, quantity: number) {
+    const of = ofValue.trim();
+    const code = String(article.code || '').trim().toUpperCase();
+
+    if (!of) {
+      setMessage({ text: 'Escribe o selecciona una OF destino.', type: 'error' });
+      return false;
+    }
+
+    if (!code) {
+      setMessage({ text: 'Selecciona o escribe un artículo.', type: 'error' });
+      return false;
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setMessage({ text: 'La cantidad debe ser mayor que cero.', type: 'error' });
+      return false;
+    }
+
+    setOfs((current) => {
+      const existing = current.find((ofBlock) => ofBlock.of.trim() === of);
+      const emptyDraft = current.find((ofBlock) => !ofBlock.of.trim() && ofBlock.materials.length === 0);
+      const material = buildMaterialLine(article, quantity);
+
+      if (!existing) {
+        if (emptyDraft) {
+          return current.map((ofBlock) =>
+            ofBlock.id === emptyDraft.id ? { ...ofBlock, of, materials: [material] } : ofBlock
+          );
+        }
+
+        return [...current, { id: crypto.randomUUID(), of, materials: [material] }];
+      }
+
+      return current.map((ofBlock) => {
+        if (ofBlock.id !== existing.id) return ofBlock;
+
+        const existingLine = ofBlock.materials.find((line) => line.code === code);
+        if (existingLine) {
+          return {
+            ...ofBlock,
+            materials: ofBlock.materials.map((line) =>
+              line.code === code
+                ? { ...line, quantity: roundQuantity(line.quantity + quantity) }
+                : line
+            )
+          };
+        }
+
+        return { ...ofBlock, materials: [...ofBlock.materials, material] };
+      });
+    });
+
+    setMessage({
+      text: article.widthWarning ? `Línea añadida. Aviso: ${article.widthWarning}` : 'Línea añadida.',
+      type: article.widthWarning ? 'error' : 'ok'
+    });
+    return true;
   }
 
   function removeLine(ofId: string, lineId: string) {
@@ -270,7 +388,7 @@ function App() {
           <FileSpreadsheet aria-hidden="true" />
           <div>
             <h1>Reserva de materiales</h1>
-            <p>Excel compatible con RPS, articulos desde la base de datos.</p>
+            <p>Excel compatible con RPS, artículos desde la base de datos.</p>
           </div>
         </div>
         <DatabaseStatus state={databaseState} />
@@ -291,7 +409,7 @@ function App() {
           onClick={() => setActiveTab('articles')}
         >
           <Boxes aria-hidden="true" />
-          Articulos
+          Artículos
         </button>
       </nav>
 
@@ -323,7 +441,7 @@ function App() {
           </section>
         </section>
       ) : (
-        <ArticleCatalog ofs={ofs} onAddLine={addLine} />
+        <ArticleCatalog ofs={ofs} onAddLineToOf={addLineByOfValue} />
       )}
     </main>
   );
@@ -351,18 +469,17 @@ function ReservationPanel({
   return (
     <aside className="summary-panel">
       <label className="field">
-        <span>Nº pedido</span>
+        <span>N.º pedido</span>
         <input
           value={orderCode}
           onChange={(event) => setOrderCode(event.target.value)}
-          placeholder="AR2602587"
           autoComplete="off"
         />
       </label>
 
       <div className="metrics">
         <Metric label="OFs" value={totals.ofs} />
-        <Metric label="lineas" value={totals.lines} />
+        <Metric label="líneas" value={totals.lines} />
         <Metric label="uds." value={formatNumber(totals.units)} />
       </div>
 
@@ -372,7 +489,7 @@ function ReservationPanel({
       </button>
       <button className="button button-ghost" type="button" onClick={onAddOf}>
         <Plus aria-hidden="true" />
-        Anadir OF
+        Añadir OF
       </button>
       <button className="button button-muted" type="button" onClick={onClearAll}>
         <X aria-hidden="true" />
@@ -443,7 +560,6 @@ function OfCard({
             value={ofBlock.of}
             onChange={(event) => onChangeOf(ofBlock.id, event.target.value.trim())}
             inputMode="numeric"
-            placeholder="228890"
           />
         </label>
         <button className="icon-button danger" type="button" onClick={() => onRemoveOf(ofBlock.id)} title="Eliminar OF">
@@ -467,19 +583,18 @@ function OfCard({
             type="number"
             min="0.000001"
             step="0.01"
-            placeholder="1"
           />
         </label>
         <button className="button button-secondary" type="button" onClick={commitLine}>
           <PackagePlus aria-hidden="true" />
-          Anadir
+          Añadir
         </button>
       </div>
 
       <div className={`selected-article ${selectedArticle?.widthWarning ? 'warning' : ''}`}>
         {selectedArticle
-          ? `${selectedArticle.code} · ${selectedArticle.description || ''}${selectedArticle.detectedWidth ? ` · ancho ${selectedArticle.detectedWidth}` : ''}`
-          : 'Busca en la base de datos o escribe un codigo exacto.'}
+          ? `${selectedArticle.code} · ${formatDisplayText(selectedArticle.description) || ''}${selectedArticle.detectedWidth ? ` · ancho ${selectedArticle.detectedWidth}` : ''}`
+          : 'Busca en la base de datos o escribe un código exacto.'}
         {selectedArticle?.widthWarning && (
           <span>
             <AlertTriangle aria-hidden="true" />
@@ -564,7 +679,7 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
 
   return (
     <label className="field article-search">
-      <span>Articulo</span>
+      <span>Artículo</span>
       <div className="search-input">
         <Search aria-hidden="true" />
         <input
@@ -574,7 +689,6 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(articles.length > 0)}
-          placeholder="Codigo, material, color, medida..."
           autoComplete="off"
         />
         {isLoading && <Loader2 className="spin" aria-hidden="true" />}
@@ -583,7 +697,7 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
       {isOpen && (
         <div className="results">
           {articles.length === 0 ? (
-            <div className="empty-result">Sin resultados. Puedes usar el codigo escrito.</div>
+            <div className="empty-result">Sin resultados. Puedes usar el código escrito.</div>
           ) : (
             articles.map((article) => (
               <button
@@ -598,8 +712,8 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
                 }}
               >
                 <strong>{article.code}</strong>
-                <span>{article.description}</span>
-                <em>{[article.family, article.subfamily, article.productionSection].filter(Boolean).join(' · ')}</em>
+                <span>{formatDisplayText(article.description)}</span>
+                <em>{[article.family, article.subfamily, article.productionSection].filter(Boolean).map(formatDisplayText).join(' · ')}</em>
               </button>
             ))
           )}
@@ -611,10 +725,10 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
 
 function ArticleCatalog({
   ofs,
-  onAddLine
+  onAddLineToOf
 }: {
   ofs: OfBlock[];
-  onAddLine: (ofId: string, article: Article, quantity: number) => void;
+  onAddLineToOf: (of: string, article: Article, quantity: number) => boolean;
 }) {
   const [filters, setFilters] = useState<CatalogFilterState>(defaultCatalogFilters);
   const [debouncedFilters, setDebouncedFilters] = useState<CatalogFilterState>(defaultCatalogFilters);
@@ -628,14 +742,50 @@ function ArticleCatalog({
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/article-filters')
+    const params = new URLSearchParams({
+      family: filters.family,
+      subfamily: filters.subfamily,
+      includeOmitted: String(filters.includeOmitted)
+    });
+
+    fetch(`/api/article-filters?${params.toString()}`)
       .then((response) => {
         if (!response.ok) throw new Error('filters failed');
         return response.json();
       })
       .then((data) => setFilterOptions(data.filters || filterOptions))
       .catch(() => setFilterOptions(filterOptions));
-  }, []);
+  }, [filters.family, filters.subfamily, filters.includeOmitted]);
+
+  useEffect(() => {
+    setFilters((current) => {
+      const next = { ...current };
+      let changed = false;
+
+      if (next.family && !filterOptions.family.includes(next.family)) {
+        next.family = '';
+        next.subfamily = '';
+        changed = true;
+      }
+
+      if (next.subfamily && !filterOptions.subfamily.includes(next.subfamily)) {
+        next.subfamily = '';
+        changed = true;
+      }
+
+      if (next.unit && !filterOptions.unit.includes(next.unit)) {
+        next.unit = '';
+        changed = true;
+      }
+
+      if (next.productionSection && !filterOptions.productionSection.includes(next.productionSection)) {
+        next.productionSection = '';
+        changed = true;
+      }
+
+      return changed ? next : current;
+    });
+  }, [filterOptions]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedFilters(filters), 220);
@@ -652,6 +802,7 @@ function ArticleCatalog({
       productionSection: debouncedFilters.productionSection,
       active: String(debouncedFilters.active),
       hideBlocked: String(debouncedFilters.hideBlocked),
+      includeOmitted: String(debouncedFilters.includeOmitted),
       limit: '180'
     });
 
@@ -684,15 +835,19 @@ function ArticleCatalog({
             <input
               value={filters.q}
               onChange={(event) => updateFilter('q', event.target.value)}
-              placeholder="Familia, referencia, color, seccion..."
               autoComplete="off"
             />
           </div>
         </label>
-        <FilterSelect label="Familia" value={filters.family} options={filterOptions.family} onChange={(value) => updateFilter('family', value)} />
+        <FilterSelect
+          label="Familia"
+          value={filters.family}
+          options={filterOptions.family}
+          onChange={(value) => setFilters((current) => ({ ...current, family: value, subfamily: '' }))}
+        />
         <FilterSelect label="Subfamilia" value={filters.subfamily} options={filterOptions.subfamily} onChange={(value) => updateFilter('subfamily', value)} />
         <FilterSelect label="Unidad" value={filters.unit} options={filterOptions.unit} onChange={(value) => updateFilter('unit', value)} />
-        <FilterSelect label="Seccion" value={filters.productionSection} options={filterOptions.productionSection} onChange={(value) => updateFilter('productionSection', value)} />
+        <FilterSelect label="Sección" value={filters.productionSection} options={filterOptions.productionSection} onChange={(value) => updateFilter('productionSection', value)} />
         <label className="toggle-field">
           <input
             type="checkbox"
@@ -709,34 +864,41 @@ function ArticleCatalog({
           />
           Sin bloqueos
         </label>
+        <label className="toggle-field">
+          <input
+            type="checkbox"
+            checked={filters.includeOmitted}
+            onChange={(event) => updateFilter('includeOmitted', event.target.checked)}
+          />
+          Mostrar omitidos
+        </label>
       </div>
 
       <div className="catalog-table-wrap">
         <table className="catalog-table">
           <thead>
             <tr>
-              <th>Familia</th>
-              <th>Subfamilia</th>
               <th>Referencia</th>
-              <th>Articulo</th>
+              <th>Artículo</th>
+              <th>Clasificación</th>
               <th>Unidad</th>
               <th>Ancho</th>
-              <th>Seccion</th>
+              <th>Sección</th>
               <th>Estado</th>
-              <th>Anadir</th>
+              <th>Añadir a reserva</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td className="empty-row" colSpan={9}>
+                <td className="empty-row" colSpan={8}>
                   <Loader2 className="spin inline-loader" aria-hidden="true" />
-                  Cargando articulos...
+                  Cargando artículos...
                 </td>
               </tr>
             ) : articles.length === 0 ? (
               <tr>
-                <td className="empty-row" colSpan={9}>Sin articulos con estos filtros.</td>
+                <td className="empty-row" colSpan={8}>Sin artículos con estos filtros.</td>
               </tr>
             ) : (
               articles.map((article) => (
@@ -744,7 +906,7 @@ function ArticleCatalog({
                   key={article.idArticle}
                   article={article}
                   ofs={ofs}
-                  onAddLine={onAddLine}
+                  onAddLineToOf={onAddLineToOf}
                 />
               ))
             )}
@@ -766,77 +928,208 @@ function FilterSelect({
   options: string[];
   onChange: (value: string) => void;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const visibleOptions = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('es-ES');
+    return q
+      ? options.filter((option) => option.toLocaleLowerCase('es-ES').includes(q)).slice(0, 80)
+      : options.slice(0, 80);
+  }, [options, query]);
+  const isDisabled = options.length === 0 && value === '';
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+        setQuery('');
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [isOpen]);
+
   return (
-    <label className="field">
+    <div className="field apple-select-field" ref={rootRef}>
       <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Todos</option>
-        {options.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </select>
-    </label>
+      <button
+        className={`apple-select-trigger ${isOpen ? 'open' : ''}`}
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        disabled={isDisabled}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+      >
+        <span>{value ? formatDisplayText(value) : 'Todos'}</span>
+        <ChevronDown aria-hidden="true" />
+      </button>
+
+      {isOpen && !isDisabled && (
+        <div className="apple-select-menu">
+          {options.length > 8 && (
+            <div className="apple-select-search">
+              <Search aria-hidden="true" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                autoFocus
+              />
+            </div>
+          )}
+          <div className="apple-select-options" role="listbox">
+            <button
+              className={`apple-select-option ${value === '' ? 'selected' : ''}`}
+              type="button"
+              onClick={() => {
+                onChange('');
+                setIsOpen(false);
+                setQuery('');
+              }}
+              role="option"
+              aria-selected={value === ''}
+            >
+              <span>Todos</span>
+              {value === '' && <Check aria-hidden="true" />}
+            </button>
+            {visibleOptions.map((option) => (
+              <button
+                className={`apple-select-option ${value === option ? 'selected' : ''}`}
+                type="button"
+                key={option}
+                onClick={() => {
+                  onChange(option);
+                  setIsOpen(false);
+                  setQuery('');
+                }}
+                role="option"
+                aria-selected={value === option}
+              >
+                <span>{formatDisplayText(option)}</span>
+                {value === option && <Check aria-hidden="true" />}
+              </button>
+            ))}
+            {visibleOptions.length === 0 && (
+              <div className="apple-select-empty">Sin opciones</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 function ArticleRow({
   article,
   ofs,
-  onAddLine
+  onAddLineToOf
 }: {
   article: Article;
   ofs: OfBlock[];
-  onAddLine: (ofId: string, article: Article, quantity: number) => void;
+  onAddLineToOf: (of: string, article: Article, quantity: number) => boolean;
 }) {
-  const [quantity, setQuantity] = useState('1');
-  const [ofId, setOfId] = useState(ofs[0]?.id || '');
+  const [quantity, setQuantity] = useState('');
+  const writtenOfs = useMemo(() => ofs.map((ofBlock) => ofBlock.of.trim()).filter(Boolean), [ofs]);
+  const [selectedOf, setSelectedOf] = useState('');
+  const [newOf, setNewOf] = useState('');
+  const isNewOf = selectedOf === '__new__';
+  const ofTarget = isNewOf ? newOf : selectedOf;
 
-  useEffect(() => {
-    if (!ofs.some((item) => item.id === ofId)) {
-      setOfId(ofs[0]?.id || '');
+  function commitCatalogLine() {
+    const added = onAddLineToOf(ofTarget, article, Number(quantity));
+    if (added) {
+      setQuantity('');
+      if (isNewOf) {
+        setSelectedOf('');
+        setNewOf('');
+      }
     }
-  }, [ofs, ofId]);
+  }
 
   const isBlocked = article.blockedPurchase || article.blockedManufacturing;
+  const showProductLine = article.productLine && !article.productLine.toLowerCase().startsWith('creado en traspaso');
 
   return (
     <tr>
-      <td>{article.family || '-'}</td>
-      <td>{article.subfamily || '-'}</td>
-      <td><strong>{article.code}</strong></td>
-      <td>{article.description}</td>
-      <td title={article.unitDescription || ''}>{article.unitCode || '-'}</td>
-      <td>
+      <td className="catalog-reference">
+        <strong>{article.code}</strong>
+        {article.normaUne && <span>{formatDisplayText(article.normaUne)}</span>}
+      </td>
+      <td className="catalog-article">
+        <span>{formatDisplayText(article.description) || '-'}</span>
+        {showProductLine && <em>{formatDisplayText(article.productLine)}</em>}
+      </td>
+      <td className="catalog-classification">
+        {article.family && <span className="catalog-chip strong">{formatDisplayText(article.family)}</span>}
+        {article.subfamily && <span className="catalog-chip">{formatDisplayText(article.subfamily)}</span>}
+        {!article.family && !article.subfamily && <span className="catalog-muted">-</span>}
+      </td>
+      <td className="catalog-unit" title={formatDisplayText(article.unitDescription)}>{article.unitCode || '-'}</td>
+      <td className="catalog-width">
         <span className={article.widthWarning ? 'width-warning' : ''}>
           {article.detectedWidth ? `${article.detectedWidth}` : '-'}
         </span>
         {article.widthWarning && <AlertTriangle aria-label={article.widthWarning} />}
       </td>
-      <td>{article.productionSection || '-'}</td>
+      <td className="catalog-section">{formatDisplayText(article.productionSection) || '-'}</td>
       <td>
         <span className={`status-chip ${!article.isActive ? 'inactive' : isBlocked ? 'blocked' : 'active'}`}>
           {!article.isActive ? 'Inactivo' : isBlocked ? 'Bloqueado' : 'Activo'}
         </span>
       </td>
-      <td>
+      <td className="catalog-add-cell">
         <div className="row-add">
-          <select value={ofId} onChange={(event) => setOfId(event.target.value)} aria-label="OF destino">
-            {ofs.map((ofBlock, index) => (
-              <option key={ofBlock.id} value={ofBlock.id}>
-                {ofBlock.of || `OF ${index + 1}`}
-              </option>
-            ))}
-          </select>
-          <input
-            value={quantity}
-            onChange={(event) => setQuantity(event.target.value)}
-            type="number"
-            min="0.000001"
-            step="0.01"
-            aria-label="Cantidad"
-          />
-          <button className="icon-button add" type="button" onClick={() => onAddLine(ofId, article, Number(quantity))} title="Anadir a reserva">
+          <label className="row-add-field">
+            <span>OF</span>
+            <select
+              value={selectedOf}
+              onChange={(event) => {
+                setSelectedOf(event.target.value);
+                if (event.target.value !== '__new__') setNewOf('');
+              }}
+              aria-label="OF destino"
+            >
+              <option value="">Seleccionar OF</option>
+              {writtenOfs.map((of) => (
+                <option key={of} value={of}>{of}</option>
+              ))}
+              <option value="__new__">Nueva OF...</option>
+            </select>
+          </label>
+          {isNewOf && (
+            <label className="row-add-field new-of">
+              <span>Nueva OF</span>
+              <input
+                value={newOf}
+                onChange={(event) => setNewOf(event.target.value.trim())}
+                placeholder="Escribir OF"
+                aria-label="Nueva OF"
+              />
+            </label>
+          )}
+          <label className="row-add-field quantity">
+            <span>Cant.</span>
+            <input
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  commitCatalogLine();
+                }
+              }}
+              type="number"
+              min="0.000001"
+              step="0.01"
+              aria-label="Cantidad"
+            />
+          </label>
+          <button className="row-add-button" type="button" onClick={commitCatalogLine}>
             <PackagePlus aria-hidden="true" />
+            Añadir
           </button>
         </div>
       </td>
@@ -856,8 +1149,8 @@ function MaterialTable({
       <table className="materials-table">
         <thead>
           <tr>
-            <th>Articulo</th>
-            <th>Descripcion</th>
+            <th>Artículo</th>
+            <th>Descripción</th>
             <th>Ancho</th>
             <th>Cantidad</th>
             <th aria-label="Acciones" />
@@ -866,13 +1159,13 @@ function MaterialTable({
         <tbody>
           {ofBlock.materials.length === 0 ? (
             <tr>
-              <td className="empty-row" colSpan={5}>Sin materiales todavia.</td>
+              <td className="empty-row" colSpan={5}>Sin materiales todavía.</td>
             </tr>
           ) : (
             ofBlock.materials.map((line) => (
               <tr key={line.id}>
                 <td><strong>{line.code}</strong></td>
-                <td>{line.description}</td>
+                <td>{formatDisplayText(line.description)}</td>
                 <td>
                   <span className={line.widthWarning ? 'width-warning' : ''}>{line.width || '-'}</span>
                 </td>
@@ -899,12 +1192,58 @@ function createOf(): OfBlock {
   };
 }
 
+function buildMaterialLine(article: Article, quantity: number): MaterialLine {
+  return {
+    id: crypto.randomUUID(),
+    code: String(article.code || '').trim().toUpperCase(),
+    description: article.description || '',
+    quantity: roundQuantity(quantity),
+    width: article.detectedWidth ?? null,
+    widthWarning: article.widthWarning ?? null
+  };
+}
+
 function roundQuantity(value: number) {
   return Math.round(value * 1000000) / 1000000;
 }
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 6 }).format(value || 0);
+}
+
+function formatDisplayText(value?: string | null) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+
+  let hasWrittenWord = false;
+
+  return clean
+    .split(/(\s+|[-/(),.])/)
+    .map((part) => {
+      if (!part.trim() || /^[-/(),.]$/.test(part)) return part;
+      if (/^\d/.test(part)) return part;
+
+      const upper = part.toLocaleUpperCase('es-ES');
+      if (technicalTerms.has(upper) || /^ML\d*/i.test(part)) {
+        hasWrittenWord = true;
+        return upper;
+      }
+
+      const lower = applyWordCorrection(part.toLocaleLowerCase('es-ES'));
+      const shouldCapitalize = !hasWrittenWord && !lowerCaseWords.has(lower);
+      hasWrittenWord = true;
+
+      return shouldCapitalize
+        ? lower.charAt(0).toLocaleUpperCase('es-ES') + lower.slice(1)
+        : lower;
+    })
+    .join('')
+    .replace(/\s+([),.])/g, '$1')
+    .replace(/([(])\s+/g, '$1');
+}
+
+function applyWordCorrection(word: string) {
+  return wordCorrections[word] || word;
 }
 
 createRoot(document.getElementById('root')!).render(<App />);
