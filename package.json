@@ -8,23 +8,33 @@
     "dev": "node src/server.js",
     "dev:watch": "node --watch src/server.js",
     "build": "vite build",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "lint": "eslint ."
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "compression": "^1.8.1",
     "dotenv": "^17.2.3",
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "lucide-react": "^0.468.0",
+    "mssql": "^12.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "mssql": "^12.1.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.62.1",
     "vite": "^6.0.5"
   }
 }

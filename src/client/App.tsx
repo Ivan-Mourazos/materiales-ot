@@ -1,20 +1,29 @@
-import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   AlertTriangle,
   Boxes,
   Check,
+  CheckCircle2,
   ChevronDown,
   Database,
   FileSpreadsheet,
+  Folder,
+  History,
+  Info,
   Loader2,
+  Monitor,
+  Moon,
   PackagePlus,
   Plus,
   Save,
   Search,
+  Sun,
   Trash2,
-  X
+  X,
+  XCircle
 } from 'lucide-react';
+import '@fontsource-variable/inter';
 import './styles.css';
 
 type Article = {
@@ -59,9 +68,33 @@ type PersistedState = {
   ofs: OfBlock[];
 };
 
-type Message = {
+type ToastType = 'ok' | 'error' | 'warn' | 'info';
+
+type ToastAction = {
+  label: string;
+  run: () => void;
+};
+
+type Toast = {
+  id: string;
   text: string;
-  type: 'ok' | 'error' | 'idle';
+  type: ToastType;
+  action?: ToastAction;
+  leaving?: boolean;
+};
+
+type ThemeMode = 'light' | 'dark' | 'system';
+
+type ConnectionState = 'checking' | 'ok' | 'error';
+
+type HistoryEntry = {
+  id: string;
+  createdAt: string;
+  orderCode: string;
+  ofs: { of: string; materials: { code: string; description: string; quantity: number }[] }[];
+  files: { of: string; filename: string; overwritten: boolean }[];
+  orderArchive: { filename: string; overwritten: boolean } | null;
+  totals: { ofs: number; lines: number; units: number };
 };
 
 type ArticleFilters = {
@@ -83,6 +116,7 @@ type CatalogFilterState = {
 };
 
 const storageKey = 'materiales-ot-state-v3';
+const themeStorageKey = 'materiales-ot-theme';
 const technicalTerms = new Set([
   'BD',
   'ID',
@@ -148,14 +182,67 @@ const defaultCatalogFilters: CatalogFilterState = {
   includeOmitted: false
 };
 
+function useTheme() {
+  const [mode, setMode] = useState<ThemeMode>(() => {
+    const saved = localStorage.getItem(themeStorageKey);
+    return saved === 'light' || saved === 'dark' ? saved : 'system';
+  });
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => {
+      document.documentElement.dataset.theme =
+        mode === 'system' ? (media.matches ? 'dark' : 'light') : mode;
+    };
+
+    apply();
+
+    if (mode === 'system') {
+      localStorage.removeItem(themeStorageKey);
+      media.addEventListener('change', apply);
+      return () => media.removeEventListener('change', apply);
+    }
+
+    localStorage.setItem(themeStorageKey, mode);
+  }, [mode]);
+
+  return { mode, setMode };
+}
+
+function useToasts() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((current) =>
+      current.map((toast) => (toast.id === id ? { ...toast, leaving: true } : toast))
+    );
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 260);
+  }, []);
+
+  const pushToast = useCallback((text: string, type: ToastType = 'info', action?: ToastAction) => {
+    const id = crypto.randomUUID();
+    setToasts((current) => [...current.slice(-3), { id, text, type, action }]);
+    const ttl = action ? 7000 : type === 'error' ? 6500 : 4200;
+    window.setTimeout(() => dismissToast(id), ttl);
+  }, [dismissToast]);
+
+  return { toasts, pushToast, dismissToast };
+}
+
 function App() {
   const [orderCode, setOrderCode] = useState('');
   const [ofs, setOfs] = useState<OfBlock[]>(() => [createOf()]);
-  const [databaseState, setDatabaseState] = useState<'checking' | 'ok' | 'error'>('checking');
-  const [message, setMessage] = useState<Message>({ text: '', type: 'idle' });
+  const [databaseState, setDatabaseState] = useState<ConnectionState>('checking');
+  const [networkState, setNetworkState] = useState<ConnectionState>('checking');
   const [isSavingToNetwork, setIsSavingToNetwork] = useState(false);
-  const [activeTab, setActiveTab] = useState<'reservations' | 'articles'>('reservations');
+  const [activeTab, setActiveTab] = useState<'reservations' | 'articles' | 'history'>('reservations');
+  const [overwritePrompt, setOverwritePrompt] = useState<string[] | null>(null);
+  const [historyVersion, setHistoryVersion] = useState(0);
   const [, startTransition] = useTransition();
+  const { mode: themeMode, setMode: setThemeMode } = useTheme();
+  const { toasts, pushToast, dismissToast } = useToasts();
 
   useEffect(() => {
     const raw = localStorage.getItem(storageKey);
@@ -177,20 +264,30 @@ function App() {
   useEffect(() => {
     let alive = true;
 
-    fetch('/api/health')
-      .then((response) => {
+    async function checkHealth() {
+      try {
+        const response = await fetch('/api/health');
         if (!response.ok) throw new Error('health failed');
-        return response.json();
-      })
-      .then((data) => {
-        if (alive) setDatabaseState(data.database ? 'ok' : 'error');
-      })
-      .catch(() => {
-        if (alive) setDatabaseState('error');
-      });
+        const data = await response.json();
+        if (!alive) return;
+        setDatabaseState(data.database ? 'ok' : 'error');
+        setNetworkState(data.networkSave ? 'ok' : 'error');
+      } catch {
+        if (!alive) return;
+        setDatabaseState('error');
+        setNetworkState('error');
+      }
+    }
+
+    checkHealth();
+    const interval = window.setInterval(checkHealth, 60000);
+    const handleFocus = () => checkHealth();
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       alive = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
@@ -203,15 +300,39 @@ function App() {
     };
   }, [ofs]);
 
+  const duplicateOfs = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const ofBlock of ofs) {
+      const key = ofBlock.of.trim();
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return new Set(Array.from(counts).filter(([, count]) => count > 1).map(([key]) => key));
+  }, [ofs]);
+
   function addOf() {
     startTransition(() => setOfs((current) => [...current, createOf()]));
   }
 
   function removeOf(id: string) {
-    setOfs((current) => {
-      const next = current.filter((ofBlock) => ofBlock.id !== id);
-      return next.length ? next : [createOf()];
-    });
+    const index = ofs.findIndex((ofBlock) => ofBlock.id === id);
+    if (index === -1) return;
+
+    const removed = ofs[index];
+    const next = ofs.filter((ofBlock) => ofBlock.id !== id);
+    setOfs(next.length ? next : [createOf()]);
+
+    if (removed.of.trim() || removed.materials.length > 0) {
+      pushToast(`OF ${removed.of.trim() || index + 1} eliminada.`, 'info', {
+        label: 'Deshacer',
+        run: () =>
+          setOfs((current) => {
+            if (current.some((ofBlock) => ofBlock.id === removed.id)) return current;
+            const rest = current.filter((ofBlock) => ofBlock.of.trim() || ofBlock.materials.length > 0);
+            const at = Math.min(index, rest.length);
+            return [...rest.slice(0, at), removed, ...rest.slice(at)];
+          })
+      });
+    }
   }
 
   function updateOf(id: string, of: string) {
@@ -221,13 +342,13 @@ function App() {
   function addLine(ofId: string, article: Article, quantity: number) {
     const code = String(article.code || '').trim().toUpperCase();
     if (!code) {
-      setMessage({ text: 'Selecciona o escribe un artículo.', type: 'error' });
-      return;
+      pushToast('Selecciona o escribe un artículo.', 'error');
+      return false;
     }
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      setMessage({ text: 'La cantidad debe ser mayor que cero.', type: 'error' });
-      return;
+      pushToast('La cantidad debe ser mayor que cero.', 'error');
+      return false;
     }
 
     setOfs((current) =>
@@ -262,10 +383,12 @@ function App() {
         };
       })
     );
-    setMessage({
-      text: article.widthWarning ? `Línea añadida. Aviso: ${article.widthWarning}` : 'Línea añadida.',
-      type: article.widthWarning ? 'error' : 'ok'
-    });
+    if (article.widthWarning) {
+      pushToast(`Línea añadida. Aviso: ${article.widthWarning}`, 'warn');
+    } else {
+      pushToast('Línea añadida.', 'ok');
+    }
+    return true;
   }
 
   function addLineByOfValue(ofValue: string, article: Article, quantity: number) {
@@ -273,17 +396,17 @@ function App() {
     const code = String(article.code || '').trim().toUpperCase();
 
     if (!of) {
-      setMessage({ text: 'Escribe o selecciona una OF destino.', type: 'error' });
+      pushToast('Escribe o selecciona una OF destino.', 'error');
       return false;
     }
 
     if (!code) {
-      setMessage({ text: 'Selecciona o escribe un artículo.', type: 'error' });
+      pushToast('Selecciona o escribe un artículo.', 'error');
       return false;
     }
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      setMessage({ text: 'La cantidad debe ser mayor que cero.', type: 'error' });
+      pushToast('La cantidad debe ser mayor que cero.', 'error');
       return false;
     }
 
@@ -321,10 +444,11 @@ function App() {
       });
     });
 
-    setMessage({
-      text: article.widthWarning ? `Línea añadida. Aviso: ${article.widthWarning}` : 'Línea añadida.',
-      type: article.widthWarning ? 'error' : 'ok'
-    });
+    if (article.widthWarning) {
+      pushToast(`Línea añadida a OF ${of}. Aviso: ${article.widthWarning}`, 'warn');
+    } else {
+      pushToast(`Línea añadida a OF ${of}.`, 'ok');
+    }
     return true;
   }
 
@@ -338,15 +462,46 @@ function App() {
     );
   }
 
-  function clearAll() {
-    setOrderCode('');
-    setOfs([createOf()]);
-    setMessage({ text: 'Formulario limpio.', type: 'ok' });
+  function updateLineQuantity(ofId: string, lineId: string, quantity: number) {
+    setOfs((current) =>
+      current.map((ofBlock) =>
+        ofBlock.id === ofId
+          ? {
+            ...ofBlock,
+            materials: ofBlock.materials.map((line) =>
+              line.id === lineId ? { ...line, quantity: roundQuantity(quantity) } : line
+            )
+          }
+          : ofBlock
+      )
+    );
   }
 
-  async function saveExcelToNetwork() {
+  function clearAll() {
+    const snapshot = { orderCode, ofs };
+    const hadContent = Boolean(orderCode.trim()) || ofs.some((ofBlock) => ofBlock.of.trim() || ofBlock.materials.length > 0);
+
+    setOrderCode('');
+    setOfs([createOf()]);
+
+    if (hadContent) {
+      pushToast('Formulario limpio.', 'info', {
+        label: 'Deshacer',
+        run: () => {
+          setOrderCode(snapshot.orderCode);
+          setOfs(snapshot.ofs);
+        }
+      });
+    }
+  }
+
+  async function saveExcelToNetwork(confirmOverwrite = false) {
+    if (duplicateOfs.size > 0) {
+      pushToast(`Hay OFs repetidas: ${Array.from(duplicateOfs).join(', ')}. Únelas antes de generar.`, 'error');
+      return;
+    }
+
     setIsSavingToNetwork(true);
-    setMessage({ text: 'Generando reservas en carpeta compartida...', type: 'idle' });
 
     try {
       const response = await fetch('/api/export/save', {
@@ -354,6 +509,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderCode,
+          confirmOverwrite,
           ofs: ofs.map((ofBlock) => ({
             of: ofBlock.of,
             materials: ofBlock.materials
@@ -362,20 +518,31 @@ function App() {
       });
 
       const data = await response.json().catch(() => ({}));
+
+      if (response.status === 409 && data.needsConfirmation) {
+        setOverwritePrompt(data.existing || []);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(data.error || 'No se pudo guardar el Excel en la carpeta compartida.');
       }
 
-      const savedCount = Array.isArray(data.saved) ? data.saved.length : 0;
-      const archiveText = data.orderArchive ? ` Pedido archivado: ${data.orderArchive.filename}` : '';
-      setMessage({
-        text: savedCount === 1
-          ? `Reserva generada: ${data.saved[0].filename}.${archiveText}`
-          : `Reservas generadas: ${savedCount}.${archiveText}`,
-        type: 'ok'
-      });
+      const saved: { filename: string; overwritten?: boolean }[] = Array.isArray(data.saved) ? data.saved : [];
+      const overwrittenCount = saved.filter((item) => item.overwritten).length
+        + (data.orderArchive?.overwritten ? 1 : 0);
+      const overwriteText = overwrittenCount > 0 ? ` (${overwrittenCount} sobrescritos)` : '';
+      const archiveText = data.orderArchive ? ` Pedido archivado: ${data.orderArchive.filename}.` : '';
+
+      pushToast(
+        saved.length === 1
+          ? `Reserva generada: ${saved[0].filename}${overwriteText}.${archiveText}`
+          : `Reservas generadas: ${saved.length}${overwriteText}.${archiveText}`,
+        'ok'
+      );
+      setHistoryVersion((current) => current + 1);
     } catch (error) {
-      setMessage({ text: error instanceof Error ? error.message : 'Error inesperado.', type: 'error' });
+      pushToast(error instanceof Error ? error.message : 'Error inesperado.', 'error');
     } finally {
       setIsSavingToNetwork(false);
     }
@@ -385,13 +552,15 @@ function App() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <FileSpreadsheet aria-hidden="true" />
-          <div>
-            <h1>Reserva de materiales</h1>
-            <p>Excel compatible con RPS, artículos desde la base de datos.</p>
-          </div>
+          <h1 className="sr-only">Materiales OT</h1>
+          <img className="brand-logo brand-logo-light" src="/logo-light.png" alt="Materiales OT" />
+          <img className="brand-logo brand-logo-dark" src="/logo-dark.png" alt="Materiales OT" />
         </div>
-        <DatabaseStatus state={databaseState} />
+        <div className="topbar-actions">
+          <StatusPill kind="database" state={databaseState} />
+          <StatusPill kind="network" state={networkState} />
+          <ThemeToggle mode={themeMode} onChange={setThemeMode} />
+        </div>
       </header>
 
       <nav className="app-tabs" aria-label="Vistas">
@@ -411,17 +580,24 @@ function App() {
           <Boxes aria-hidden="true" />
           Artículos
         </button>
+        <button
+          className={activeTab === 'history' ? 'active' : ''}
+          type="button"
+          onClick={() => setActiveTab('history')}
+        >
+          <History aria-hidden="true" />
+          Historial
+        </button>
       </nav>
 
       {activeTab === 'reservations' ? (
-        <section className="workspace">
+        <section className="workspace view" key="reservations">
           <ReservationPanel
             orderCode={orderCode}
             setOrderCode={setOrderCode}
             totals={totals}
-            message={message}
             isSavingToNetwork={isSavingToNetwork}
-            onSave={saveExcelToNetwork}
+            onSave={() => saveExcelToNetwork()}
             onAddOf={addOf}
             onClearAll={clearAll}
           />
@@ -432,18 +608,274 @@ function App() {
                 key={ofBlock.id}
                 index={index}
                 ofBlock={ofBlock}
+                isDuplicate={Boolean(ofBlock.of.trim()) && duplicateOfs.has(ofBlock.of.trim())}
                 onChangeOf={updateOf}
                 onRemoveOf={removeOf}
                 onAddLine={addLine}
                 onRemoveLine={removeLine}
+                onUpdateLineQuantity={updateLineQuantity}
               />
             ))}
           </section>
         </section>
+      ) : activeTab === 'articles' ? (
+        <div className="view" key="articles">
+          <ArticleCatalog ofs={ofs} onAddLineToOf={addLineByOfValue} />
+        </div>
       ) : (
-        <ArticleCatalog ofs={ofs} onAddLineToOf={addLineByOfValue} />
+        <div className="view" key="history">
+          <HistoryView version={historyVersion} />
+        </div>
       )}
+
+      {overwritePrompt && (
+        <ConfirmDialog
+          files={overwritePrompt}
+          onCancel={() => setOverwritePrompt(null)}
+          onConfirm={() => {
+            setOverwritePrompt(null);
+            saveExcelToNetwork(true);
+          }}
+        />
+      )}
+
+      <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </main>
+  );
+}
+
+function ConfirmDialog({
+  files,
+  onCancel,
+  onConfirm
+}: {
+  files: string[];
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onCancel();
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div
+        className="modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="overwrite-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modal-icon">
+          <AlertTriangle aria-hidden="true" />
+        </div>
+        <h2 id="overwrite-title">Ya existen archivos con ese nombre</h2>
+        <p>
+          Estos archivos ya están en la carpeta compartida y se van a <strong>sobrescribir</strong>.
+          Si RPS aún no los procesó, se perderá la reserva anterior.
+        </p>
+        <ul className="modal-files">
+          {files.map((file) => (
+            <li key={file}>
+              <FileSpreadsheet aria-hidden="true" />
+              {file}
+            </li>
+          ))}
+        </ul>
+        <div className="modal-actions">
+          <button className="button button-muted" type="button" onClick={onCancel} autoFocus>
+            Cancelar
+          </button>
+          <button className="button button-danger" type="button" onClick={onConfirm}>
+            Sobrescribir
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoryView({ version }: { version: number }) {
+  const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setIsLoading(true);
+
+    fetch('/api/history?limit=100')
+      .then((response) => {
+        if (!response.ok) throw new Error('history failed');
+        return response.json();
+      })
+      .then((data) => {
+        if (alive) setEntries(data.entries || []);
+      })
+      .catch(() => {
+        if (alive) setEntries([]);
+      })
+      .finally(() => {
+        if (alive) setIsLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [version]);
+
+  return (
+    <section className="history-view">
+      {isLoading ? (
+        <div className="history-empty">
+          <Loader2 className="spin" aria-hidden="true" />
+          Cargando historial...
+        </div>
+      ) : entries.length === 0 ? (
+        <div className="history-empty">
+          <History aria-hidden="true" />
+          <p>Aún no hay reservas generadas desde la web.</p>
+          <span>Cuando generes una reserva aparecerá aquí, con sus OFs y materiales.</span>
+        </div>
+      ) : (
+        entries.map((entry) => <HistoryCard key={entry.id} entry={entry} />)
+      )}
+    </section>
+  );
+}
+
+const historyDateFormat = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'short' });
+
+function HistoryCard({ entry }: { entry: HistoryEntry }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const overwrittenCount = entry.files.filter((file) => file.overwritten).length
+    + (entry.orderArchive?.overwritten ? 1 : 0);
+
+  return (
+    <article className={`history-card ${isOpen ? 'open' : ''}`}>
+      <button className="history-head" type="button" onClick={() => setIsOpen((current) => !current)} aria-expanded={isOpen}>
+        <ChevronDown className="history-chevron" aria-hidden="true" />
+        <div className="history-title">
+          <strong>{entry.orderCode ? `Pedido ${entry.orderCode}` : `OF ${entry.ofs.map((item) => item.of).join(', ')}`}</strong>
+          <span>{historyDateFormat.format(new Date(entry.createdAt))}</span>
+        </div>
+        <div className="history-meta">
+          <span className="history-chip">{entry.totals.ofs} {entry.totals.ofs === 1 ? 'OF' : 'OFs'}</span>
+          <span className="history-chip">{entry.totals.lines} {entry.totals.lines === 1 ? 'línea' : 'líneas'}</span>
+          <span className="history-chip">{formatNumber(entry.totals.units)} uds.</span>
+          {overwrittenCount > 0 && <span className="history-chip warn">{overwrittenCount} sobrescritos</span>}
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="history-detail">
+          {entry.ofs.map((ofBlock) => (
+            <div className="history-of" key={ofBlock.of}>
+              <div className="history-of-head">
+                <strong>OF {ofBlock.of}</strong>
+                <span>{fileLabelFor(entry, ofBlock.of)}</span>
+              </div>
+              <table className="history-table">
+                <thead>
+                  <tr>
+                    <th>Artículo</th>
+                    <th>Descripción</th>
+                    <th>Cantidad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ofBlock.materials.map((line, index) => (
+                    <tr key={`${line.code}-${index}`}>
+                      <td><strong>{line.code}</strong></td>
+                      <td>{formatDisplayText(line.description) || '-'}</td>
+                      <td>{formatNumber(line.quantity)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+          {entry.orderArchive && (
+            <div className="history-archive">
+              <FileSpreadsheet aria-hidden="true" />
+              Archivo de pedido: <strong>{entry.orderArchive.filename}</strong>
+              {entry.orderArchive.overwritten && <span className="history-chip warn">sobrescrito</span>}
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function fileLabelFor(entry: HistoryEntry, of: string) {
+  const file = entry.files.find((item) => item.of === of);
+  if (!file) return '';
+  return file.overwritten ? `${file.filename} (sobrescrito)` : file.filename;
+}
+
+function ThemeToggle({ mode, onChange }: { mode: ThemeMode; onChange: (mode: ThemeMode) => void }) {
+  const options: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
+    { value: 'light', label: 'Tema claro', icon: <Sun aria-hidden="true" /> },
+    { value: 'system', label: 'Tema del sistema', icon: <Monitor aria-hidden="true" /> },
+    { value: 'dark', label: 'Tema oscuro', icon: <Moon aria-hidden="true" /> }
+  ];
+
+  return (
+    <div className="theme-toggle" role="radiogroup" aria-label="Tema de la interfaz">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          className={mode === option.value ? 'active' : ''}
+          type="button"
+          role="radio"
+          aria-checked={mode === option.value}
+          title={option.label}
+          onClick={() => onChange(option.value)}
+        >
+          {option.icon}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const toastIcons: Record<ToastType, React.ReactNode> = {
+  ok: <CheckCircle2 aria-hidden="true" />,
+  error: <XCircle aria-hidden="true" />,
+  warn: <AlertTriangle aria-hidden="true" />,
+  info: <Info aria-hidden="true" />
+};
+
+function ToastViewport({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
+  return (
+    <div className="toast-viewport" aria-live="polite" aria-label="Notificaciones">
+      {toasts.map((toast) => (
+        <div key={toast.id} className={`toast ${toast.type} ${toast.leaving ? 'leaving' : ''}`} role="status">
+          {toastIcons[toast.type]}
+          <p>{toast.text}</p>
+          {toast.action && (
+            <button
+              className="toast-action"
+              type="button"
+              onClick={() => {
+                toast.action?.run();
+                onDismiss(toast.id);
+              }}
+            >
+              {toast.action.label}
+            </button>
+          )}
+          <button type="button" onClick={() => onDismiss(toast.id)} aria-label="Cerrar notificación">
+            <X aria-hidden="true" />
+          </button>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -451,7 +883,6 @@ function ReservationPanel({
   orderCode,
   setOrderCode,
   totals,
-  message,
   isSavingToNetwork,
   onSave,
   onAddOf,
@@ -460,21 +891,41 @@ function ReservationPanel({
   orderCode: string;
   setOrderCode: (value: string) => void;
   totals: { ofs: number; lines: number; units: number };
-  message: Message;
   isSavingToNetwork: boolean;
   onSave: () => void;
   onAddOf: () => void;
   onClearAll: () => void;
 }) {
+  const orderYear = detectOrderYear(orderCode);
+  const hasOrderCode = Boolean(orderCode.trim());
+
   return (
     <aside className="summary-panel">
+      <h2 className="panel-title">Resumen</h2>
+
       <label className="field">
         <span>N.º pedido</span>
         <input
           value={orderCode}
           onChange={(event) => setOrderCode(event.target.value)}
           autoComplete="off"
+          placeholder="Opcional"
         />
+        {hasOrderCode && (
+          <span className={`order-hint ${orderYear ? 'ok' : 'warn'}`}>
+            {orderYear ? (
+              <>
+                <Check aria-hidden="true" />
+                Se archivará en la carpeta {orderYear}
+              </>
+            ) : (
+              <>
+                <AlertTriangle aria-hidden="true" />
+                No se detecta el año (formato esperado: AR26XXXX)
+              </>
+            )}
+          </span>
+        )}
       </label>
 
       <div className="metrics">
@@ -485,7 +936,7 @@ function ReservationPanel({
 
       <button className="button button-primary" type="button" onClick={onSave} disabled={isSavingToNetwork}>
         {isSavingToNetwork ? <Loader2 className="spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
-        Generar reserva
+        {isSavingToNetwork ? 'Generando...' : 'Generar reserva'}
       </button>
       <button className="button button-ghost" type="button" onClick={onAddOf}>
         <Plus aria-hidden="true" />
@@ -495,21 +946,21 @@ function ReservationPanel({
         <X aria-hidden="true" />
         Limpiar
       </button>
-
-      <div className={`notice ${message.type}`} aria-live="polite">
-        {message.text}
-      </div>
     </aside>
   );
 }
 
-function DatabaseStatus({ state }: { state: 'checking' | 'ok' | 'error' }) {
-  const label = state === 'checking' ? 'BD: comprobando' : state === 'ok' ? 'BD: conectada' : 'BD: error';
+const statusPillLabels: Record<'database' | 'network', Record<ConnectionState, string>> = {
+  database: { checking: 'Comprobando BD', ok: 'BD conectada', error: 'BD sin conexión' },
+  network: { checking: 'Comprobando red', ok: 'Carpeta de red OK', error: 'Red sin acceso' }
+};
 
+function StatusPill({ kind, state }: { kind: 'database' | 'network'; state: ConnectionState }) {
   return (
-    <div className={`status-pill ${state}`}>
-      <Database aria-hidden="true" />
-      {label}
+    <div className={`status-pill ${state}`} title={statusPillLabels[kind][state]}>
+      <span className="status-dot" aria-hidden="true" />
+      {kind === 'database' ? <Database aria-hidden="true" /> : <Folder aria-hidden="true" />}
+      {statusPillLabels[kind][state]}
     </div>
   );
 }
@@ -526,33 +977,39 @@ function Metric({ label, value }: { label: string; value: number | string }) {
 function OfCard({
   index,
   ofBlock,
+  isDuplicate,
   onChangeOf,
   onRemoveOf,
   onAddLine,
-  onRemoveLine
+  onRemoveLine,
+  onUpdateLineQuantity
 }: {
   index: number;
   ofBlock: OfBlock;
+  isDuplicate: boolean;
   onChangeOf: (id: string, of: string) => void;
   onRemoveOf: (id: string) => void;
-  onAddLine: (ofId: string, article: Article, quantity: number) => void;
+  onAddLine: (ofId: string, article: Article, quantity: number) => boolean;
   onRemoveLine: (ofId: string, lineId: string) => void;
+  onUpdateLineQuantity: (ofId: string, lineId: string, quantity: number) => void;
 }) {
   const [quantity, setQuantity] = useState('');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const pickerRef = useRef<ArticlePickerHandle>(null);
 
   function commitLine() {
-    const article = selectedArticle || pickerRef.current?.typedArticle();
-    if (!article) return;
-    onAddLine(ofBlock.id, article, Number(quantity));
+    const article = selectedArticle
+      || pickerRef.current?.typedArticle()
+      || { idArticle: '', code: '', description: '' };
+    const added = onAddLine(ofBlock.id, article, Number(quantity));
+    if (!added) return;
     setSelectedArticle(null);
     setQuantity('');
     pickerRef.current?.clear();
   }
 
   return (
-    <article className="of-card">
+    <article className={`of-card ${isDuplicate ? 'duplicate' : ''}`}>
       <div className="of-header">
         <label className="field of-number">
           <span>OF {index + 1}</span>
@@ -562,6 +1019,12 @@ function OfCard({
             inputMode="numeric"
           />
         </label>
+        {isDuplicate && (
+          <span className="duplicate-hint">
+            <AlertTriangle aria-hidden="true" />
+            OF repetida en otra tarjeta
+          </span>
+        )}
         <button className="icon-button danger" type="button" onClick={() => onRemoveOf(ofBlock.id)} title="Eliminar OF">
           <Trash2 aria-hidden="true" />
         </button>
@@ -603,7 +1066,11 @@ function OfCard({
         )}
       </div>
 
-      <MaterialTable ofBlock={ofBlock} onRemoveLine={onRemoveLine} />
+      <MaterialTable
+        ofBlock={ofBlock}
+        onRemoveLine={onRemoveLine}
+        onUpdateQuantity={(lineId, value) => onUpdateLineQuantity(ofBlock.id, lineId, value)}
+      />
     </article>
   );
 }
@@ -645,6 +1112,9 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
     if (selected && query !== selected.code) {
       setQuery(selected.code);
     }
+  // Intencionado: solo sincronizamos `query` cuando cambia `selected`.
+  // Incluir `query` en deps crearía un bucle de actualización mutua.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
   useEffect(() => {
@@ -722,6 +1192,7 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
     </label>
   );
 });
+ArticlePicker.displayName = 'ArticlePicker';
 
 function ArticleCatalog({
   ofs,
@@ -740,6 +1211,7 @@ function ArticleCatalog({
   });
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const catalogLimit = 180;
 
   useEffect(() => {
     const params = new URLSearchParams({
@@ -755,6 +1227,9 @@ function ArticleCatalog({
       })
       .then((data) => setFilterOptions(data.filters || filterOptions))
       .catch(() => setFilterOptions(filterOptions));
+  // `filterOptions` se usa solo como valor de fallback si la petición falla;
+  // incluirla en deps dispararía el fetch en cada actualización de opciones.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.family, filters.subfamily, filters.includeOmitted]);
 
   useEffect(() => {
@@ -803,7 +1278,7 @@ function ArticleCatalog({
       active: String(debouncedFilters.active),
       hideBlocked: String(debouncedFilters.hideBlocked),
       includeOmitted: String(debouncedFilters.includeOmitted),
-      limit: '180'
+      limit: String(catalogLimit)
     });
 
     setIsLoading(true);
@@ -874,6 +1349,16 @@ function ArticleCatalog({
         </label>
       </div>
 
+      <div className="catalog-meta" aria-live="polite">
+        {isLoading
+          ? 'Buscando artículos...'
+          : articles.length === 0
+            ? 'Sin resultados con estos filtros'
+            : articles.length >= catalogLimit
+              ? `Mostrando los primeros ${catalogLimit} artículos — afina la búsqueda o los filtros para ver el resto`
+              : `${articles.length} ${articles.length === 1 ? 'artículo' : 'artículos'}`}
+      </div>
+
       <div className="catalog-table-wrap">
         <table className="catalog-table">
           <thead>
@@ -890,12 +1375,7 @@ function ArticleCatalog({
           </thead>
           <tbody>
             {isLoading ? (
-              <tr>
-                <td className="empty-row" colSpan={8}>
-                  <Loader2 className="spin inline-loader" aria-hidden="true" />
-                  Cargando artículos...
-                </td>
-              </tr>
+              <SkeletonRows />
             ) : articles.length === 0 ? (
               <tr>
                 <td className="empty-row" colSpan={8}>Sin artículos con estos filtros.</td>
@@ -914,6 +1394,31 @@ function ArticleCatalog({
         </table>
       </div>
     </section>
+  );
+}
+
+const skeletonWidths = [
+  ['72%', '88%', '64%', '52%', '40%', '70%', '58%', '90%'],
+  ['58%', '74%', '80%', '44%', '36%', '62%', '58%', '84%'],
+  ['66%', '92%', '52%', '58%', '44%', '54%', '58%', '78%'],
+  ['80%', '68%', '72%', '48%', '38%', '66%', '58%', '88%'],
+  ['62%', '82%', '58%', '54%', '42%', '58%', '58%', '82%'],
+  ['70%', '76%', '68%', '50%', '36%', '64%', '58%', '86%']
+];
+
+function SkeletonRows() {
+  return (
+    <>
+      {skeletonWidths.map((row, rowIndex) => (
+        <tr className="skeleton-row" key={rowIndex} aria-hidden="true">
+          {row.map((width, cellIndex) => (
+            <td key={cellIndex}>
+              <span className="skeleton-bar" style={{ width }} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
   );
 }
 
@@ -1139,10 +1644,12 @@ function ArticleRow({
 
 function MaterialTable({
   ofBlock,
-  onRemoveLine
+  onRemoveLine,
+  onUpdateQuantity
 }: {
   ofBlock: OfBlock;
   onRemoveLine: (ofId: string, lineId: string) => void;
+  onUpdateQuantity: (lineId: string, quantity: number) => void;
 }) {
   return (
     <div className="materials-table-wrap">
@@ -1169,7 +1676,9 @@ function MaterialTable({
                 <td>
                   <span className={line.widthWarning ? 'width-warning' : ''}>{line.width || '-'}</span>
                 </td>
-                <td>{formatNumber(line.quantity)}</td>
+                <td>
+                  <QuantityCell line={line} onCommit={(value) => onUpdateQuantity(line.id, value)} />
+                </td>
                 <td>
                   <button className="remove-line" type="button" onClick={() => onRemoveLine(ofBlock.id, line.id)}>
                     <Trash2 aria-hidden="true" />
@@ -1181,6 +1690,49 @@ function MaterialTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function QuantityCell({ line, onCommit }: { line: MaterialLine; onCommit: (quantity: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
+
+  function commit() {
+    if (cancelledRef.current) {
+      cancelledRef.current = false;
+      setDraft(null);
+      return;
+    }
+    if (draft === null) return;
+    const quantity = Number(draft.replace(',', '.'));
+    if (Number.isFinite(quantity) && quantity > 0 && quantity !== line.quantity) {
+      onCommit(quantity);
+    }
+    setDraft(null);
+  }
+
+  return (
+    <input
+      className="quantity-cell-input"
+      value={draft ?? String(line.quantity)}
+      onChange={(event) => setDraft(event.target.value)}
+      onFocus={(event) => event.target.select()}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+        if (event.key === 'Escape') {
+          cancelledRef.current = true;
+          event.currentTarget.blur();
+        }
+      }}
+      type="number"
+      min="0.000001"
+      step="0.01"
+      aria-label={`Cantidad de ${line.code}`}
+    />
   );
 }
 
@@ -1205,6 +1757,14 @@ function buildMaterialLine(article: Article, quantity: number): MaterialLine {
 
 function roundQuantity(value: number) {
   return Math.round(value * 1000000) / 1000000;
+}
+
+// Réplica de la detección de año del servidor (getOrderYear en server.js)
+// para avisar antes de generar, no después.
+function detectOrderYear(orderCode: string): number | null {
+  const clean = orderCode.trim().toUpperCase().replace(/[^A-Z0-9_-]+/g, '');
+  const match = /^[A-Z]+(\d{2})/.exec(clean);
+  return match ? 2000 + Number(match[1]) : null;
 }
 
 function formatNumber(value: number) {

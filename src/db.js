@@ -3,6 +3,31 @@ import { config } from './config.js';
 
 let poolPromise;
 
+// Caché en memoria con TTL: el maestro de artículos de RPS cambia poco, así que
+// evitamos repetir los escaneos con LIKE en cada tecleo o cambio de filtro.
+const queryCache = new Map();
+const queryCacheMaxEntries = 200;
+const listTtlMs = 3 * 60 * 1000;
+const filtersTtlMs = 5 * 60 * 1000;
+
+function cachedQuery(key, ttlMs, factory) {
+  const hit = queryCache.get(key);
+  if (hit && hit.expires > Date.now()) {
+    return hit.promise;
+  }
+
+  const promise = factory();
+  promise.catch(() => queryCache.delete(key));
+  queryCache.set(key, { promise, expires: Date.now() + ttlMs });
+
+  if (queryCache.size > queryCacheMaxEntries) {
+    const oldestKey = queryCache.keys().next().value;
+    queryCache.delete(oldestKey);
+  }
+
+  return promise;
+}
+
 const excludedCatalogFamilies = [
   'OFICINA',
   'PERSONAL',
@@ -47,7 +72,7 @@ function getPool() {
 }
 
 function escapeLike(value) {
-  return value.replace(/[\\%_\[]/g, (char) => `\\${char}`);
+  return value.replace(/[\\%_[]/g, (char) => `\\${char}`);
 }
 
 function getSearchTokens(query) {
@@ -186,7 +211,12 @@ export async function checkDatabase() {
   return result.recordset[0]?.ok === 1;
 }
 
-export async function searchArticles({ query = '', limit = 25 }) {
+export function searchArticles({ query = '', limit = 25 }) {
+  const key = `search|${String(query).trim().toLowerCase()}|${limit}`;
+  return cachedQuery(key, listTtlMs, () => searchArticlesUncached({ query, limit }));
+}
+
+async function searchArticlesUncached({ query = '', limit = 25 }) {
   const q = String(query).trim();
   const tokens = getSearchTokens(q);
   const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 100);
@@ -281,7 +311,12 @@ export async function searchArticles({ query = '', limit = 25 }) {
   return result.recordset.map(mapArticle);
 }
 
-export async function listArticles({
+export function listArticles(params = {}) {
+  const key = `list|${JSON.stringify(params)}`;
+  return cachedQuery(key, listTtlMs, () => listArticlesUncached(params));
+}
+
+async function listArticlesUncached({
   query = '',
   family = '',
   subfamily = '',
@@ -390,7 +425,12 @@ export async function listArticles({
   return result.recordset.map(mapArticle);
 }
 
-export async function listArticleFilters({ family = '', subfamily = '', includeOmitted = 'false' } = {}) {
+export function listArticleFilters(params = {}) {
+  const key = `filters|${JSON.stringify(params)}`;
+  return cachedQuery(key, filtersTtlMs, () => listArticleFiltersUncached(params));
+}
+
+async function listArticleFiltersUncached({ family = '', subfamily = '', includeOmitted = 'false' } = {}) {
   const pool = await getPool();
   const request = pool.request();
   request.input('company', sql.VarChar(10), config.db.company);

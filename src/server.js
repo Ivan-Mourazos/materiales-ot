@@ -1,10 +1,13 @@
+import compression from 'compression';
 import express from 'express';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { checkDatabase, closeDatabase, listArticleFilters, listArticles, searchArticles } from './db.js';
 import { buildOfWorkbook, buildOrderArchiveWorkbook, buildReservationWorkbook } from './excel.js';
+import { appendHistory, listHistory } from './history.js';
 import { normalizeReservation } from './validation.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,23 +17,35 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 const app = express();
 
+app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', async (_req, res, next) => {
   try {
-    const exportPath = getPathStatus(config.exportDirectory);
-    const orderArchivePath = getPathStatus(config.orderArchiveRoot);
+    const [database, exportPath, orderArchivePath] = await Promise.all([
+      checkDatabase().catch(() => false),
+      getPathStatus(config.exportDirectory),
+      getPathStatus(config.orderArchiveRoot)
+    ]);
 
     res.json({
       ok: true,
-      database: await checkDatabase(),
-      networkSave: exportPath.configured && exportPath.valid,
-      orderArchive: orderArchivePath.configured && orderArchivePath.valid,
+      database,
+      networkSave: exportPath.configured && exportPath.valid && exportPath.accessible !== false,
+      orderArchive: orderArchivePath.configured && orderArchivePath.valid && orderArchivePath.accessible !== false,
       paths: {
         exportDirectory: exportPath,
         orderArchiveRoot: orderArchivePath
       }
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/history', async (req, res, next) => {
+  try {
+    res.json({ entries: await listHistory(req.query.limit) });
   } catch (error) {
     next(error);
   }
@@ -106,14 +121,14 @@ app.post('/api/export/save', async (req, res, next) => {
       return;
     }
 
-    const exportPath = getPathStatus(config.exportDirectory);
+    const exportPath = await getPathStatus(config.exportDirectory);
     if (!exportPath.valid) {
       res.status(400).json({ error: exportPath.message });
       return;
     }
 
     const reservation = normalizeReservation(req.body);
-    await fs.mkdir(config.exportDirectory, { recursive: true });
+    const confirmOverwrite = req.body?.confirmOverwrite === true;
 
     const targets = reservation.ofs.map((ofBlock) => {
       const filename = `${sanitizeOf(ofBlock.of)}.xlsx`;
@@ -133,18 +148,81 @@ app.post('/api/export/save', async (req, res, next) => {
       return;
     }
 
+    // Generar todos los libros antes de escribir nada: si algo falla
+    // (p. ej. el año del pedido), no queda ningún archivo a medias en la red.
+    for (const target of targets) {
+      target.workbook = await buildOfWorkbook(target.ofBlock);
+    }
+
+    let archiveTarget = null;
+    if (config.orderArchiveRoot && reservation.orderCode) {
+      const orderArchivePath = await getPathStatus(config.orderArchiveRoot);
+      if (!orderArchivePath.valid) {
+        res.status(400).json({ error: orderArchivePath.message });
+        return;
+      }
+
+      const savedPath = buildOrderArchivePath(reservation.orderCode);
+      archiveTarget = {
+        savedPath,
+        filename: path.basename(savedPath),
+        workbook: await buildOrderArchiveWorkbook(reservation)
+      };
+    }
+
+    await fs.mkdir(config.exportDirectory, { recursive: true });
+
+    const existing = [];
+    for (const target of targets) {
+      target.exists = await fileExists(target.savedPath);
+      if (target.exists) existing.push(target.filename);
+    }
+    if (archiveTarget) {
+      archiveTarget.exists = await fileExists(archiveTarget.savedPath);
+      if (archiveTarget.exists) existing.push(`${archiveTarget.filename} (archivo de pedido)`);
+    }
+
+    if (existing.length > 0 && !confirmOverwrite) {
+      res.status(409).json({ needsConfirmation: true, existing });
+      return;
+    }
+
     const saved = [];
     for (const target of targets) {
-      const workbook = await buildOfWorkbook(target.ofBlock);
-      await fs.writeFile(target.savedPath, workbook);
+      try {
+        await writeFileAtomic(target.savedPath, target.workbook);
+      } catch (error) {
+        console.error(error);
+        throw httpError(500, buildPartialSaveMessage(target.filename, saved));
+      }
       saved.push({
         of: target.of,
         filename: target.filename,
-        savedPath: target.savedPath
+        savedPath: target.savedPath,
+        overwritten: Boolean(target.exists)
       });
     }
 
-    const orderArchive = await saveOrderArchiveIfNeeded(reservation);
+    let orderArchive = null;
+    if (archiveTarget) {
+      try {
+        await fs.mkdir(path.dirname(archiveTarget.savedPath), { recursive: true });
+        await writeFileAtomic(archiveTarget.savedPath, archiveTarget.workbook);
+      } catch (error) {
+        console.error(error);
+        throw httpError(
+          500,
+          `Las reservas de OF se guardaron, pero no se pudo escribir el archivo de pedido ${archiveTarget.filename}. Revisa la carpeta de archivo.`
+        );
+      }
+      orderArchive = {
+        filename: archiveTarget.filename,
+        savedPath: archiveTarget.savedPath,
+        overwritten: Boolean(archiveTarget.exists)
+      };
+    }
+
+    await appendHistory(buildHistoryEntry(reservation, saved, orderArchive));
 
     res.json({ ok: true, saved, orderArchive });
   } catch (error) {
@@ -155,16 +233,17 @@ app.post('/api/export/save', async (req, res, next) => {
 await configureFrontend();
 
 app.use((error, _req, res, _next) => {
-  const status = error.message?.startsWith('La ') || error.message?.startsWith('Anade') || error.message?.startsWith('Hay ')
-    ? 400
-    : 500;
+  const status = error.statusCode
+    || (error.message?.startsWith('La ') || error.message?.startsWith('Anade') || error.message?.startsWith('Hay ')
+      ? 400
+      : 500);
 
-  if (status === 500) {
+  if (status === 500 && !error.statusCode) {
     console.error(error);
   }
 
   res.status(status).json({
-    error: status === 500 ? 'No se pudo completar la operación.' : error.message
+    error: status === 500 && !error.statusCode ? 'No se pudo completar la operación.' : error.message
   });
 });
 
@@ -222,25 +301,52 @@ function findDuplicatedFilenames(targets) {
   return Array.from(duplicated);
 }
 
-async function saveOrderArchiveIfNeeded(reservation) {
-  if (!config.orderArchiveRoot || !reservation.orderCode) {
-    return null;
+function httpError(status, message) {
+  const error = new Error(message);
+  error.statusCode = status;
+  return error;
+}
+
+function buildPartialSaveMessage(failedFilename, saved) {
+  const savedList = saved.map((item) => item.filename).join(', ');
+  return saved.length > 0
+    ? `No se pudo guardar ${failedFilename}. Sí se guardaron: ${savedList}. Revisa la carpeta compartida y vuelve a generar.`
+    : `No se pudo guardar ${failedFilename}. Revisa el acceso a la carpeta compartida.`;
+}
+
+async function fileExists(target) {
+  return fs.access(target).then(() => true, () => false);
+}
+
+async function writeFileAtomic(targetPath, buffer) {
+  const tmpPath = `${targetPath}.tmp-${process.pid}-${Date.now()}`;
+
+  await fs.writeFile(tmpPath, buffer);
+  try {
+    await fs.rename(tmpPath, targetPath);
+  } catch (error) {
+    await fs.unlink(tmpPath).catch(() => {});
+    throw error;
   }
+}
 
-  const orderArchivePath = getPathStatus(config.orderArchiveRoot);
-  if (!orderArchivePath.valid) {
-    throw new Error(orderArchivePath.message);
-  }
-
-  const archivePath = buildOrderArchivePath(reservation.orderCode);
-  await fs.mkdir(path.dirname(archivePath), { recursive: true });
-
-  const workbook = await buildOrderArchiveWorkbook(reservation);
-  await fs.writeFile(archivePath, workbook);
+function buildHistoryEntry(reservation, saved, orderArchive) {
+  const lines = reservation.ofs.flatMap((ofBlock) => ofBlock.materials);
 
   return {
-    filename: path.basename(archivePath),
-    savedPath: archivePath
+    id: randomUUID(),
+    createdAt: new Date().toISOString(),
+    orderCode: reservation.orderCode || '',
+    ofs: reservation.ofs,
+    files: saved.map(({ of, filename, overwritten }) => ({ of, filename, overwritten })),
+    orderArchive: orderArchive
+      ? { filename: orderArchive.filename, overwritten: orderArchive.overwritten }
+      : null,
+    totals: {
+      ofs: reservation.ofs.length,
+      lines: lines.length,
+      units: Math.round(lines.reduce((sum, line) => sum + line.quantity, 0) * 1000000) / 1000000
+    }
   };
 }
 
@@ -274,20 +380,47 @@ function getOrderYear(orderCode) {
   return 2000 + Number(match[1]);
 }
 
-function getPathStatus(value) {
+async function getPathStatus(value) {
   const configured = Boolean(value);
   const isUnc = isWindowsUncPath(value);
   const valid = !configured || process.platform === 'win32' || !isUnc;
 
+  let accessible = null;
+  if (configured && valid) {
+    accessible = await withTimeout(
+      fs.stat(value).then((stats) => stats.isDirectory()),
+      3000
+    ).catch(() => false);
+  }
+
   return {
     configured,
     valid,
+    accessible,
     platform: process.platform,
     type: isUnc ? 'windows-unc' : configured ? 'local-or-mounted' : 'empty',
-    message: valid
-      ? null
-      : 'Ruta de red Windows configurada en Linux. Monta la carpeta SMB/CIFS en el servidor y usa esa ruta local en .env.'
+    message: !valid
+      ? 'Ruta de red Windows configurada en Linux. Monta la carpeta SMB/CIFS en el servidor y usa esa ruta local en .env.'
+      : configured && accessible === false
+        ? 'No se puede acceder a la carpeta configurada. Comprueba la red o la ruta en .env.'
+        : null
   };
+}
+
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 }
 
 function isWindowsUncPath(value) {
@@ -296,9 +429,11 @@ function isWindowsUncPath(value) {
 
 async function configureFrontend() {
   if (isProduction) {
-    app.use(express.static(distDir));
+    // Los assets de Vite llevan hash en el nombre: caché larga e inmutable.
+    app.use(express.static(distDir, { index: false, maxAge: '1y', immutable: true }));
     app.use((req, res, next) => {
       if (req.method === 'GET' && req.accepts('html')) {
+        res.set('Cache-Control', 'no-cache');
         res.sendFile(path.join(distDir, 'index.html'));
         return;
       }
