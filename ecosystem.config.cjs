@@ -4,7 +4,6 @@ module.exports = {
       name: 'materiales-ot',
       script: 'src/server.js',
       cwd: '/webs/materiales-ot',
-      node_args: '--env-file=.env',
       env: {
         NODE_ENV: 'production'
       },
