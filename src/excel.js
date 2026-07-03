@@ -69,60 +69,55 @@ export async function buildOrderArchiveWorkbook(reservation) {
   const sheet = workbook.addWorksheet('MATERIALES');
   sheet.properties.showGridLines = true;
   sheet.columns = [
-    { width: 14 },
     { width: 18 },
-    { width: 18 },
-    { width: 44 },
-    { width: 12 }
+    { width: 46 },
+    { width: 14 }
   ];
 
   sheet.getCell('A1').value = 'N PEDIDO';
   sheet.getCell('B1').value = reservation.orderCode || '';
   sheet.getCell('A2').value = 'N OFS';
   sheet.getCell('B2').value = reservation.ofs.length;
+  sheet.getCell('B2').numFmt = '0';
   sheet.getCell('A1').font = { bold: true };
   sheet.getCell('A2').font = { bold: true };
   applyBorder(sheet, 1, 1, 2, 2);
 
   let rowIndex = 4;
   for (const ofBlock of reservation.ofs) {
-    sheet.getCell(rowIndex, 1).value = 'OF';
-    sheet.getCell(rowIndex, 2).value = numericOf(ofBlock.of);
-    sheet.getRow(rowIndex).font = { bold: true };
+    // Banner ancho y fusionado en vez de "OF" y el número en celdas separadas:
+    // así la OF no se pierde visualmente por encima de columnas vacías.
+    sheet.mergeCells(rowIndex, 1, rowIndex, 3);
+    sheet.getCell(rowIndex, 1).value = `OF ${numericOf(ofBlock.of)}`;
+    sheet.getCell(rowIndex, 1).font = { bold: true, size: 13 };
+    sheet.getCell(rowIndex, 1).alignment = { vertical: 'middle' };
     sheet.getRow(rowIndex).fill = {
       type: 'pattern',
       pattern: 'solid',
       fgColor: { argb: 'FFFFC000' }
     };
-    applyBorder(sheet, rowIndex, 1, rowIndex, 5);
+    applyBorder(sheet, rowIndex, 1, rowIndex, 3);
 
     rowIndex += 1;
-    sheet.getRow(rowIndex).values = [null, 'TIPO', 'ARTICULO', 'DESCRIPCION', 'CANTIDAD'];
+    sheet.getRow(rowIndex).values = ['ARTICULO', 'DESCRIPCION', 'CANTIDAD'];
     sheet.getRow(rowIndex).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     sheet.getRow(rowIndex).fill = {
       type: 'pattern',
       pattern: 'solid',
       fgColor: { argb: 'FF808080' }
     };
-    applyBorder(sheet, rowIndex, 1, rowIndex, 5);
+    applyBorder(sheet, rowIndex, 1, rowIndex, 3);
 
     for (const line of ofBlock.materials) {
       rowIndex += 1;
-      sheet.getRow(rowIndex).values = [
-        null,
-        line.kind || '',
-        line.code,
-        line.description || '',
-        line.quantity
-      ];
-      applyBorder(sheet, rowIndex, 1, rowIndex, 5);
+      sheet.getRow(rowIndex).values = [line.code, line.description || '', line.quantity];
+      applyBorder(sheet, rowIndex, 1, rowIndex, 3);
     }
 
     rowIndex += 2;
   }
 
-  sheet.getColumn(2).numFmt = '0';
-  sheet.getColumn(5).numFmt = 'General';
+  sheet.getColumn(3).numFmt = 'General';
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
