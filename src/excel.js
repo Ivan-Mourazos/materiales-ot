@@ -23,7 +23,9 @@ export async function buildReservationWorkbook(reservation) {
   }
 
   sheet.getColumn(1).numFmt = '0';
-  sheet.getColumn(3).numFmt = '0.######';
+  // 'General' en vez de un formato personalizado con '#': Excel muestra el
+  // separador decimal aunque no queden cifras que mostrar detrás (p. ej. "25,").
+  sheet.getColumn(3).numFmt = 'General';
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
@@ -51,7 +53,9 @@ export async function buildOfWorkbook(ofBlock) {
   }
 
   sheet.getColumn(1).numFmt = '0';
-  sheet.getColumn(3).numFmt = '0.######';
+  // 'General' en vez de un formato personalizado con '#': Excel muestra el
+  // separador decimal aunque no queden cifras que mostrar detrás (p. ej. "25,").
+  sheet.getColumn(3).numFmt = 'General';
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
@@ -118,7 +122,7 @@ export async function buildOrderArchiveWorkbook(reservation) {
   }
 
   sheet.getColumn(2).numFmt = '0';
-  sheet.getColumn(5).numFmt = '0.######';
+  sheet.getColumn(5).numFmt = 'General';
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

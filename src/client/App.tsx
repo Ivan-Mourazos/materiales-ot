@@ -547,13 +547,24 @@ function App() {
       const overwriteText = overwrittenCount > 0 ? ` (${overwrittenCount} sobrescritos)` : '';
       const archiveText = data.orderArchive ? ` Pedido archivado: ${data.orderArchive.filename}.` : '';
 
+      const snapshot = { orderCode, ofs };
+      setOrderCode('');
+      setOfs([createOf()]);
+      setHistoryVersion((current) => current + 1);
+
       pushToast(
         saved.length === 1
           ? `Reserva generada: ${saved[0].filename}${overwriteText}.${archiveText}`
           : `Reservas generadas: ${saved.length}${overwriteText}.${archiveText}`,
-        'ok'
+        'ok',
+        {
+          label: 'Restaurar campos',
+          run: () => {
+            setOrderCode(snapshot.orderCode);
+            setOfs(snapshot.ofs);
+          }
+        }
       );
-      setHistoryVersion((current) => current + 1);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : 'Error inesperado.', 'error');
     } finally {
