@@ -468,6 +468,7 @@ async function configureFrontend() {
     app.use(vite.middlewares);
     console.log('  Modo: desarrollo (Vite HMR activo)');
   } catch (error) {
+    console.warn(`  Motivo: ${error.message}`);
     const distIndex = path.join(distDir, 'index.html');
     const hasDist = await fs.access(distIndex).then(() => true, () => false);
 

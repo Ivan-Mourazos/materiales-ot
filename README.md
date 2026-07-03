@@ -48,15 +48,26 @@ ORDER_ARCHIVE_ROOT=/mnt/oftecnica/Oficina Tecnica
 
 ### 4. Arrancar con PM2
 
-```bash
-pm2 start src/server.js --name materiales-ot
-```
-
-O usando el script `start` de `package.json`:
+Usa siempre `ecosystem.config.cjs` — es lo único que arranca en modo `fork` con
+`NODE_ENV=production` de forma fiable en este servidor:
 
 ```bash
-pm2 start npm --name materiales-ot -- run start
+pm2 start ecosystem.config.cjs
+pm2 save
 ```
+
+> ⚠️ No arranques con `pm2 start src/server.js --name materiales-ot` ni con
+> `pm2 start npm -- run start` directamente: sin `NODE_ENV=production` el
+> servidor intenta levantar Vite en modo desarrollo y, si falla, la web se
+> queda en pantalla en blanco/negro. Además, sin `exec_mode: fork` explícito
+> PM2 puede arrancar el proceso en modo clúster, que no es compatible con el
+> resto de apps de este servidor. `ecosystem.config.cjs` ya fija ambas cosas —
+> si necesitas cambiar el puerto, el `cwd` o cualquier otra opción, edita ese
+> archivo en vez de pasar flags a mano en el comando `pm2 start`.
+
+`cwd` en `ecosystem.config.cjs` está fijado a `/webs/materiales-ot`; si el
+proyecto vive en otra ruta en el servidor, actualiza ese valor antes de
+arrancar.
 
 ### 5. Comandos útiles de PM2
 
@@ -84,6 +95,15 @@ git pull
 pnpm install --frozen-lockfile
 pnpm build
 pm2 restart materiales-ot
+```
+
+Si `ecosystem.config.cjs` ha cambiado (nuevas variables, cambio de `cwd`,
+etc.), `pm2 restart` no relee el archivo — hay que recargarlo entero:
+
+```bash
+pm2 delete materiales-ot
+pm2 start ecosystem.config.cjs
+pm2 save
 ```
 
 ---
