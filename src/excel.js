@@ -88,7 +88,9 @@ export async function buildOrderArchiveWorkbook(reservation) {
     // Banner ancho y fusionado en vez de "OF" y el número en celdas separadas:
     // así la OF no se pierde visualmente por encima de columnas vacías.
     sheet.mergeCells(rowIndex, 1, rowIndex, 3);
-    sheet.getCell(rowIndex, 1).value = `OF ${numericOf(ofBlock.of)}`;
+    sheet.getCell(rowIndex, 1).value = ofBlock.description
+      ? `OF ${numericOf(ofBlock.of)} — ${ofBlock.description}`
+      : `OF ${numericOf(ofBlock.of)}`;
     sheet.getCell(rowIndex, 1).font = { bold: true, size: 13 };
     sheet.getCell(rowIndex, 1).alignment = { vertical: 'middle' };
     sheet.getRow(rowIndex).fill = {

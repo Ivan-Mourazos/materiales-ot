@@ -16,6 +16,8 @@ export function normalizeReservation(payload) {
       throw new Error(`La OF ${index + 1} no tiene número.`);
     }
 
+    const description = cleanText(ofBlock?.description).slice(0, 120);
+
     const materials = Array.isArray(ofBlock?.materials) ? ofBlock.materials : [];
     const normalizedMaterials = materials
       .map((line) => {
@@ -41,7 +43,7 @@ export function normalizeReservation(payload) {
       throw new Error(`La OF ${of} no tiene materiales.`);
     }
 
-    return { of, materials: normalizedMaterials };
+    return { of, description, materials: normalizedMaterials };
   });
 
   return { orderCode, ofs: normalizedOfs };

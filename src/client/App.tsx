@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  Copy,
   Database,
   FileSpreadsheet,
   Folder,
@@ -60,6 +61,7 @@ type MaterialLine = {
 type OfBlock = {
   id: string;
   of: string;
+  description: string;
   materials: MaterialLine[];
 };
 
@@ -91,7 +93,7 @@ type HistoryEntry = {
   id: string;
   createdAt: string;
   orderCode: string;
-  ofs: { of: string; materials: { code: string; description: string; quantity: number }[] }[];
+  ofs: { of: string; description?: string; materials: { code: string; description: string; quantity: number }[] }[];
   files: { of: string; filename: string; overwritten: boolean }[];
   orderArchive: { filename: string; overwritten: boolean } | null;
   totals: { ofs: number; lines: number; units: number };
@@ -264,7 +266,11 @@ function App() {
     try {
       const saved = JSON.parse(raw) as PersistedState;
       setOrderCode(saved.orderCode || '');
-      setOfs(saved.ofs?.length ? saved.ofs : [createOf()]);
+      setOfs(
+        saved.ofs?.length
+          ? saved.ofs.map((ofBlock) => ({ ...ofBlock, description: ofBlock.description || '' }))
+          : [createOf()]
+      );
     } catch {
       setOfs([createOf()]);
     }
@@ -352,6 +358,33 @@ function App() {
     setOfs((current) => current.map((item) => (item.id === id ? { ...item, of } : item)));
   }
 
+  function updateOfDescription(id: string, description: string) {
+    setOfs((current) => current.map((item) => (item.id === id ? { ...item, description } : item)));
+  }
+
+  function reuseReservation(entry: HistoryEntry) {
+    const clones: OfBlock[] = entry.ofs.map((ofBlock) => ({
+      id: uid(),
+      of: '',
+      description: ofBlock.description || '',
+      materials: ofBlock.materials.map((line) => ({
+        id: uid(),
+        code: line.code,
+        description: line.description || '',
+        quantity: line.quantity,
+        width: null,
+        widthWarning: null
+      }))
+    }));
+
+    setOfs((current) => {
+      const rest = current.filter((ofBlock) => ofBlock.of.trim() || ofBlock.materials.length > 0);
+      return [...rest, ...clones];
+    });
+    setActiveTab('reservations');
+    pushToast('Materiales cargados desde el historial. Escribe las nuevas OF y el pedido.', 'info');
+  }
+
   function addLine(ofId: string, article: Article, quantity: number) {
     const code = String(article.code || '').trim().toUpperCase();
     if (!code) {
@@ -435,7 +468,7 @@ function App() {
           );
         }
 
-        return [...current, { id: uid(), of, materials: [material] }];
+        return [...current, { id: uid(), of, description: '', materials: [material] }];
       }
 
       return current.map((ofBlock) => {
@@ -525,6 +558,7 @@ function App() {
           confirmOverwrite,
           ofs: ofs.map((ofBlock) => ({
             of: ofBlock.of,
+            description: ofBlock.description,
             materials: ofBlock.materials
           }))
         })
@@ -634,6 +668,7 @@ function App() {
                 ofBlock={ofBlock}
                 isDuplicate={Boolean(ofBlock.of.trim()) && duplicateOfs.has(ofBlock.of.trim())}
                 onChangeOf={updateOf}
+                onChangeDescription={updateOfDescription}
                 onRemoveOf={removeOf}
                 onAddLine={addLine}
                 onRemoveLine={removeLine}
@@ -648,7 +683,7 @@ function App() {
         </div>
       ) : (
         <div className="view" key="history">
-          <HistoryView version={historyVersion} />
+          <HistoryView version={historyVersion} onReuse={reuseReservation} />
         </div>
       )}
 
@@ -724,7 +759,7 @@ function ConfirmDialog({
   );
 }
 
-function HistoryView({ version }: { version: number }) {
+function HistoryView({ version, onReuse }: { version: number; onReuse: (entry: HistoryEntry) => void }) {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -766,7 +801,7 @@ function HistoryView({ version }: { version: number }) {
           <span>Cuando generes una reserva aparecerá aquí, con sus OFs y materiales.</span>
         </div>
       ) : (
-        entries.map((entry) => <HistoryCard key={entry.id} entry={entry} />)
+        entries.map((entry) => <HistoryCard key={entry.id} entry={entry} onReuse={onReuse} />)
       )}
     </section>
   );
@@ -774,26 +809,36 @@ function HistoryView({ version }: { version: number }) {
 
 const historyDateFormat = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'short' });
 
-function HistoryCard({ entry }: { entry: HistoryEntry }) {
+function HistoryCard({ entry, onReuse }: { entry: HistoryEntry; onReuse: (entry: HistoryEntry) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const overwrittenCount = entry.files.filter((file) => file.overwritten).length
     + (entry.orderArchive?.overwritten ? 1 : 0);
+  const descriptions = Array.from(
+    new Set(entry.ofs.map((ofBlock) => (ofBlock.description || '').trim()).filter(Boolean))
+  ).join(' · ');
 
   return (
     <article className={`history-card ${isOpen ? 'open' : ''}`}>
-      <button className="history-head" type="button" onClick={() => setIsOpen((current) => !current)} aria-expanded={isOpen}>
-        <ChevronDown className="history-chevron" aria-hidden="true" />
-        <div className="history-title">
-          <strong>{entry.orderCode ? `Pedido ${entry.orderCode}` : `OF ${entry.ofs.map((item) => item.of).join(', ')}`}</strong>
-          <span>{historyDateFormat.format(new Date(entry.createdAt))}</span>
-        </div>
-        <div className="history-meta">
-          <span className="history-chip">{entry.totals.ofs} {entry.totals.ofs === 1 ? 'OF' : 'OFs'}</span>
-          <span className="history-chip">{entry.totals.lines} {entry.totals.lines === 1 ? 'línea' : 'líneas'}</span>
-          <span className="history-chip">{formatNumber(entry.totals.units)} uds.</span>
-          {overwrittenCount > 0 && <span className="history-chip warn">{overwrittenCount} sobrescritos</span>}
-        </div>
-      </button>
+      <div className="history-row">
+        <button className="history-head" type="button" onClick={() => setIsOpen((current) => !current)} aria-expanded={isOpen}>
+          <ChevronDown className="history-chevron" aria-hidden="true" />
+          <div className="history-title">
+            <strong>{entry.orderCode ? `Pedido ${entry.orderCode}` : `OF ${entry.ofs.map((item) => item.of).join(', ')}`}</strong>
+            {descriptions && <em>{descriptions}</em>}
+            <span>{historyDateFormat.format(new Date(entry.createdAt))}</span>
+          </div>
+          <div className="history-meta">
+            <span className="history-chip">{entry.totals.ofs} {entry.totals.ofs === 1 ? 'OF' : 'OFs'}</span>
+            <span className="history-chip">{entry.totals.lines} {entry.totals.lines === 1 ? 'línea' : 'líneas'}</span>
+            <span className="history-chip">{formatNumber(entry.totals.units)} uds.</span>
+            {overwrittenCount > 0 && <span className="history-chip warn">{overwrittenCount} sobrescritos</span>}
+          </div>
+        </button>
+        <button className="history-reuse" type="button" onClick={() => onReuse(entry)} title="Añadir estos materiales a una nueva reserva">
+          <Copy aria-hidden="true" />
+          Reutilizar
+        </button>
+      </div>
 
       {isOpen && (
         <div className="history-detail">
@@ -801,6 +846,7 @@ function HistoryCard({ entry }: { entry: HistoryEntry }) {
             <div className="history-of" key={ofBlock.of}>
               <div className="history-of-head">
                 <strong>OF {ofBlock.of}</strong>
+                {ofBlock.description && <em>{ofBlock.description}</em>}
                 <span>{fileLabelFor(entry, ofBlock.of)}</span>
               </div>
               <table className="history-table">
@@ -1003,6 +1049,7 @@ function OfCard({
   ofBlock,
   isDuplicate,
   onChangeOf,
+  onChangeDescription,
   onRemoveOf,
   onAddLine,
   onRemoveLine,
@@ -1012,6 +1059,7 @@ function OfCard({
   ofBlock: OfBlock;
   isDuplicate: boolean;
   onChangeOf: (id: string, of: string) => void;
+  onChangeDescription: (id: string, description: string) => void;
   onRemoveOf: (id: string) => void;
   onAddLine: (ofId: string, article: Article, quantity: number) => boolean;
   onRemoveLine: (ofId: string, lineId: string) => void;
@@ -1043,16 +1091,27 @@ function OfCard({
             inputMode="numeric"
           />
         </label>
-        {isDuplicate && (
-          <span className="duplicate-hint">
-            <AlertTriangle aria-hidden="true" />
-            OF repetida en otra tarjeta
-          </span>
-        )}
+        <label className="field of-description">
+          <span>Descripción</span>
+          <input
+            value={ofBlock.description}
+            onChange={(event) => onChangeDescription(ofBlock.id, event.target.value)}
+            placeholder="Ej.: lateral escenario"
+            maxLength={120}
+            autoComplete="off"
+          />
+        </label>
         <button className="icon-button danger" type="button" onClick={() => onRemoveOf(ofBlock.id)} title="Eliminar OF">
           <Trash2 aria-hidden="true" />
         </button>
       </div>
+
+      {isDuplicate && (
+        <div className="duplicate-hint">
+          <AlertTriangle aria-hidden="true" />
+          OF repetida en otra tarjeta
+        </div>
+      )}
 
       <div className="line-editor">
         <ArticlePicker ref={pickerRef} selected={selectedArticle} onSelect={setSelectedArticle} />
@@ -1775,6 +1834,7 @@ function createOf(): OfBlock {
   return {
     id: uid(),
     of: '',
+    description: '',
     materials: []
   };
 }

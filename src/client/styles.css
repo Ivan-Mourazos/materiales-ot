@@ -637,7 +637,7 @@ select:focus {
 }
 
 .of-header {
-  grid-template-columns: minmax(140px, 220px) minmax(0, 1fr) 38px;
+  grid-template-columns: minmax(130px, 190px) minmax(0, 1fr) 38px;
   margin-bottom: 14px;
 }
 
@@ -646,10 +646,10 @@ select:focus {
 }
 
 .duplicate-hint {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 38px;
+  margin: -6px 0 12px;
   color: var(--warn-ink);
   font-size: 12.5px;
   font-weight: 600;
@@ -1719,8 +1719,16 @@ select:focus {
   box-shadow: var(--shadow-2);
 }
 
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 14px;
+}
+
 .history-head {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
@@ -1731,6 +1739,33 @@ select:focus {
   color: var(--ink);
   cursor: pointer;
   text-align: left;
+}
+
+.history-reuse {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-s);
+  padding: 6px 11px;
+  background: transparent;
+  color: var(--accent-ink);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.history-reuse:hover {
+  background: var(--accent-soft);
+}
+
+.history-reuse svg {
+  width: 14px;
+  height: 14px;
 }
 
 .history-chevron {
@@ -1761,6 +1796,16 @@ select:focus {
 .history-title span {
   color: var(--ink-3);
   font-size: 12px;
+}
+
+.history-title em {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-style: normal;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .history-meta {
@@ -1814,6 +1859,13 @@ select:focus {
 .history-of-head strong {
   font-size: 13px;
   font-weight: 650;
+}
+
+.history-of-head em {
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-style: normal;
+  font-weight: 550;
 }
 
 .history-of-head span {
@@ -2040,6 +2092,15 @@ select:focus {
 
   .of-header {
     grid-template-columns: 1fr 38px;
+  }
+
+  .of-header .of-description {
+    grid-column: 1 / -1;
+  }
+
+  .of-header .icon-button {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .toast-viewport {
