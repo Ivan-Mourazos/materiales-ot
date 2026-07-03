@@ -205,6 +205,63 @@ function mapArticle(row) {
   };
 }
 
+// Stock por artículo y almacén desde STKStock. Se consulta aparte (una sola
+// query para todos los artículos de la página) para no engordar los joins de
+// la consulta principal del catálogo.
+async function getStocksForArticles(articleIds) {
+  if (articleIds.length === 0) return new Map();
+
+  const pool = await getPool();
+  const request = pool.request();
+  request.input('company', sql.VarChar(10), config.db.company);
+  articleIds.forEach((id, index) => {
+    request.input(`article${index}`, sql.VarChar(80), id);
+  });
+  const idParams = articleIds.map((_, index) => `@article${index}`).join(', ');
+
+  const result = await request.query(`
+    SELECT
+      s.IDArticle AS idArticle,
+      w.CodWarehouse AS warehouseCode,
+      w.Description AS warehouse,
+      SUM(s.Stock) AS quantity
+    FROM dbo.STKStock s
+    JOIN dbo.GENWarehouse w
+      ON w.IDWarehouse = s.IDWarehouse
+      AND w.CodCompany = s.CodCompany
+    WHERE s.CodCompany = @company
+      AND s.IDArticle IN (${idParams})
+      AND s.Stock <> 0
+      AND w.ClosedDate IS NULL
+      AND (w.InactiveDate IS NULL OR w.InactiveDate > GETDATE())
+    GROUP BY s.IDArticle, w.CodWarehouse, w.Description
+    ORDER BY s.IDArticle, SUM(s.Stock) DESC
+  `);
+
+  const stocks = new Map();
+  for (const row of result.recordset) {
+    const quantity = Math.round(Number(row.quantity) * 1000000) / 1000000;
+    if (!quantity) continue;
+    const list = stocks.get(row.idArticle) || [];
+    list.push({
+      warehouseCode: row.warehouseCode,
+      warehouse: row.warehouse,
+      quantity
+    });
+    stocks.set(row.idArticle, list);
+  }
+
+  return stocks;
+}
+
+function attachStocks(articles, stocks) {
+  return articles.map((article) => {
+    const list = stocks.get(article.idArticle) || [];
+    const total = Math.round(list.reduce((sum, item) => sum + item.quantity, 0) * 1000000) / 1000000;
+    return { ...article, stockTotal: list.length ? total : null, stocks: list };
+  });
+}
+
 export async function checkDatabase() {
   const pool = await getPool();
   const result = await pool.request().query('SELECT 1 AS ok');
@@ -422,7 +479,9 @@ async function listArticlesUncached({
       a.CodArticle;
   `);
 
-  return result.recordset.map(mapArticle);
+  const articles = result.recordset.map(mapArticle);
+  const stocks = await getStocksForArticles(articles.map((article) => article.idArticle));
+  return attachStocks(articles, stocks);
 }
 
 export function listArticleFilters(params = {}) {

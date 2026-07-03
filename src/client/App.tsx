@@ -47,6 +47,8 @@ type Article = {
   isActive?: boolean;
   detectedWidth?: number | null;
   widthWarning?: string | null;
+  stockTotal?: number | null;
+  stocks?: { warehouseCode: string; warehouse: string; quantity: number }[];
 };
 
 type MaterialLine = {
@@ -1462,6 +1464,7 @@ function ArticleCatalog({
               <th>Clasificación</th>
               <th>Unidad</th>
               <th>Ancho</th>
+              <th>Stock</th>
               <th>Sección</th>
               <th>Estado</th>
               <th>Añadir a reserva</th>
@@ -1472,7 +1475,7 @@ function ArticleCatalog({
               <SkeletonRows />
             ) : articles.length === 0 ? (
               <tr>
-                <td className="empty-row" colSpan={8}>Sin artículos con estos filtros.</td>
+                <td className="empty-row" colSpan={9}>Sin artículos con estos filtros.</td>
               </tr>
             ) : (
               articles.map((article) => (
@@ -1491,13 +1494,46 @@ function ArticleCatalog({
   );
 }
 
+const maxVisibleStocks = 3;
+
+function StockCell({ article }: { article: Article }) {
+  const stocks = article.stocks || [];
+
+  if (article.stockTotal === null || article.stockTotal === undefined || stocks.length === 0) {
+    return <td className="catalog-stock"><span className="catalog-muted">-</span></td>;
+  }
+
+  const visible = stocks.slice(0, maxVisibleStocks);
+  const hidden = stocks.slice(maxVisibleStocks);
+  const fullBreakdown = stocks
+    .map((item) => `${formatDisplayText(item.warehouse)}: ${formatNumber(item.quantity)}`)
+    .join('\n');
+
+  return (
+    <td className="catalog-stock" title={fullBreakdown}>
+      <strong className={article.stockTotal < 0 ? 'stock-negative' : ''}>
+        {formatNumber(article.stockTotal)}
+      </strong>
+      <span className="stock-places">
+        {visible.map((item) => (
+          <span className="stock-place" key={item.warehouseCode}>
+            <em>{formatDisplayText(item.warehouse)}</em>
+            {formatNumber(item.quantity)}
+          </span>
+        ))}
+        {hidden.length > 0 && <span className="stock-more">+{hidden.length} más</span>}
+      </span>
+    </td>
+  );
+}
+
 const skeletonWidths = [
-  ['72%', '88%', '64%', '52%', '40%', '70%', '58%', '90%'],
-  ['58%', '74%', '80%', '44%', '36%', '62%', '58%', '84%'],
-  ['66%', '92%', '52%', '58%', '44%', '54%', '58%', '78%'],
-  ['80%', '68%', '72%', '48%', '38%', '66%', '58%', '88%'],
-  ['62%', '82%', '58%', '54%', '42%', '58%', '58%', '82%'],
-  ['70%', '76%', '68%', '50%', '36%', '64%', '58%', '86%']
+  ['72%', '88%', '64%', '52%', '40%', '60%', '70%', '58%', '90%'],
+  ['58%', '74%', '80%', '44%', '36%', '52%', '62%', '58%', '84%'],
+  ['66%', '92%', '52%', '58%', '44%', '66%', '54%', '58%', '78%'],
+  ['80%', '68%', '72%', '48%', '38%', '58%', '66%', '58%', '88%'],
+  ['62%', '82%', '58%', '54%', '42%', '48%', '58%', '58%', '82%'],
+  ['70%', '76%', '68%', '50%', '36%', '62%', '64%', '58%', '86%']
 ];
 
 function SkeletonRows() {
@@ -1673,6 +1709,7 @@ function ArticleRow({
         </span>
         {article.widthWarning && <AlertTriangle aria-label={article.widthWarning} />}
       </td>
+      <StockCell article={article} />
       <td className="catalog-section">{formatDisplayText(article.productionSection) || '-'}</td>
       <td>
         <span className={`status-chip ${!article.isActive ? 'inactive' : isBlocked ? 'blocked' : 'active'}`}>
