@@ -368,7 +368,7 @@ function buildOrderArchivePath(orderCode) {
     throw new Error('No pude determinar el año desde el número de pedido.');
   }
 
-  return path.join(config.orderArchiveRoot, String(year), `M.${cleanOrder}.xlsx`);
+  return path.join(config.orderArchiveRoot, String(year), 'Reserva Materiales', `M.${cleanOrder}.xlsx`);
 }
 
 function sanitizeOrderCode(value) {

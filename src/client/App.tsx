@@ -929,7 +929,7 @@ function ReservationPanel({
             {orderYear ? (
               <>
                 <Check aria-hidden="true" />
-                Se archivará en la carpeta {orderYear}
+                Se archivará en {orderYear}/Reserva Materiales
               </>
             ) : (
               <>
