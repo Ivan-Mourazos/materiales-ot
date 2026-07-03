@@ -1113,6 +1113,10 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  // Al seleccionar un resultado, ponemos su código en `query`, lo que dispararía
+  // otra vez la búsqueda con debounce y reabriría el desplegable. Esta bandera
+  // hace que esa única búsqueda posterior a una selección se salte.
+  const skipSearchRef = useRef(false);
 
   React.useImperativeHandle(ref, () => ({
     clear() {
@@ -1142,6 +1146,11 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
   }, [selected]);
 
   useEffect(() => {
+    if (skipSearchRef.current) {
+      skipSearchRef.current = false;
+      return;
+    }
+
     if (debounced.length < 2) {
       setArticles([]);
       setIsOpen(false);
@@ -1179,6 +1188,7 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
         <input
           value={query}
           onChange={(event) => {
+            skipSearchRef.current = false;
             setQuery(event.target.value);
             setIsOpen(true);
           }}
@@ -1200,6 +1210,7 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
                 key={article.idArticle}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
+                  skipSearchRef.current = true;
                   onSelect(article);
                   setQuery(article.code);
                   setIsOpen(false);
