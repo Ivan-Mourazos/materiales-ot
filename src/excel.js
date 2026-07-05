@@ -125,7 +125,7 @@ export async function buildOrderArchiveWorkbook(reservation) {
   return Buffer.from(buffer);
 }
 
-export function buildFinalRows(ofs) {
+function buildFinalRows(ofs) {
   const grouped = new Map();
 
   for (const ofBlock of ofs) {

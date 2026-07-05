@@ -1,2 +1,25 @@
 allowBuilds:
   esbuild: true
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - '@azure/msal-browser'
+  - '@azure/msal-common'
+  - '@azure/msal-node'
+  - '@typescript-eslint/eslint-plugin'
+  - '@typescript-eslint/parser'
+  - '@typescript-eslint/project-service'
+  - '@typescript-eslint/scope-manager'
+  - '@typescript-eslint/tsconfig-utils'
+  - '@typescript-eslint/type-utils'
+  - '@typescript-eslint/types'
+  - '@typescript-eslint/typescript-estree'
+  - '@typescript-eslint/utils'
+  - '@typescript-eslint/visitor-keys'
+  - brace-expansion
+  - caniuse-lite
+  - electron-to-chromium
+  - typescript-eslint
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - semver
+  - undici-types

@@ -20,24 +20,23 @@ export function normalizeReservation(payload) {
 
     const materials = Array.isArray(ofBlock?.materials) ? ofBlock.materials : [];
     const normalizedMaterials = materials
-      .map((line) => {
+      .flatMap((line) => {
         const code = cleanText(line?.code || line?.codArticle || line?.articleCode).toUpperCase();
         const description = cleanText(line?.description);
         const quantity = Number(line?.quantity);
 
-        if (!code && !description && !quantity) return null;
+        if (!code && !description && !quantity) return [];
         if (!code) throw new Error(`Hay una línea sin artículo en la OF ${of}.`);
         if (!Number.isFinite(quantity) || quantity <= 0) {
           throw new Error(`La cantidad de ${code} en la OF ${of} debe ser mayor que cero.`);
         }
 
-        return {
+        return [{
           code,
           description,
           quantity: roundQuantity(quantity)
-        };
-      })
-      .filter(Boolean);
+        }];
+      });
 
     if (normalizedMaterials.length === 0) {
       throw new Error(`La OF ${of} no tiene materiales.`);

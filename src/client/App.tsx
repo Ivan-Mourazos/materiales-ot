@@ -199,6 +199,36 @@ const defaultCatalogFilters: CatalogFilterState = {
   includeOmitted: false
 };
 
+const numberFormatter = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 6 });
+const catalogLimit = 180;
+
+const themeOptions: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
+  { value: 'light', label: 'Tema claro', icon: <Sun aria-hidden="true" /> },
+  { value: 'system', label: 'Tema del sistema', icon: <Monitor aria-hidden="true" /> },
+  { value: 'dark', label: 'Tema oscuro', icon: <Moon aria-hidden="true" /> }
+];
+
+function getInitialReservationState(): PersistedState {
+  if (typeof localStorage === 'undefined') {
+    return { orderCode: '', ofs: [createOf()] };
+  }
+
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return { orderCode: '', ofs: [createOf()] };
+
+    const saved = JSON.parse(raw) as PersistedState;
+    return {
+      orderCode: saved.orderCode || '',
+      ofs: saved.ofs?.length
+        ? saved.ofs.map((ofBlock) => ({ ...ofBlock, description: ofBlock.description || '' }))
+        : [createOf()]
+    };
+  } catch {
+    return { orderCode: '', ofs: [createOf()] };
+  }
+}
+
 function useTheme() {
   const [mode, setMode] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem(themeStorageKey);
@@ -249,8 +279,9 @@ function useToasts() {
 }
 
 function App() {
-  const [orderCode, setOrderCode] = useState('');
-  const [ofs, setOfs] = useState<OfBlock[]>(() => [createOf()]);
+  const initialReservationState = useMemo(getInitialReservationState, []);
+  const [orderCode, setOrderCode] = useState(initialReservationState.orderCode);
+  const [ofs, setOfs] = useState<OfBlock[]>(initialReservationState.ofs);
   const [databaseState, setDatabaseState] = useState<ConnectionState>('checking');
   const [networkState, setNetworkState] = useState<ConnectionState>('checking');
   const [isSavingToNetwork, setIsSavingToNetwork] = useState(false);
@@ -260,23 +291,6 @@ function App() {
   const [, startTransition] = useTransition();
   const { mode: themeMode, setMode: setThemeMode } = useTheme();
   const { toasts, pushToast, dismissToast } = useToasts();
-
-  useEffect(() => {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return;
-
-    try {
-      const saved = JSON.parse(raw) as PersistedState;
-      setOrderCode(saved.orderCode || '');
-      setOfs(
-        saved.ofs?.length
-          ? saved.ofs.map((ofBlock) => ({ ...ofBlock, description: ofBlock.description || '' }))
-          : [createOf()]
-      );
-    } catch {
-      setOfs([createOf()]);
-    }
-  }, []);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({ orderCode, ofs }));
@@ -327,7 +341,11 @@ function App() {
       const key = ofBlock.of.trim();
       if (key) counts.set(key, (counts.get(key) || 0) + 1);
     }
-    return new Set(Array.from(counts).filter(([, count]) => count > 1).map(([key]) => key));
+    const duplicates = new Set<string>();
+    for (const [key, count] of counts) {
+      if (count > 1) duplicates.add(key);
+    }
+    return duplicates;
   }, [ofs]);
 
   function addOf() {
@@ -714,22 +732,30 @@ function ConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onCancel();
-    }
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onCancel]);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    dialog.showModal();
+
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, []);
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    <dialog
+      ref={dialogRef}
+      className="modal-overlay"
+      aria-labelledby="overwrite-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onCancel();
+      }}
+    >
       <div
         className="modal"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="overwrite-title"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-icon">
@@ -749,7 +775,7 @@ function ConfirmDialog({
           ))}
         </ul>
         <div className="modal-actions">
-          <button className="button button-muted" type="button" onClick={onCancel} autoFocus>
+          <button className="button button-muted" type="button" onClick={onCancel}>
             Cancelar
           </button>
           <button className="button button-danger" type="button" onClick={onConfirm}>
@@ -757,7 +783,7 @@ function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -767,7 +793,6 @@ function HistoryView({ version, onReuse }: { version: number; onReuse: (entry: H
 
   useEffect(() => {
     let alive = true;
-    setIsLoading(true);
 
     fetch('/api/history?limit=100')
       .then((response) => {
@@ -816,7 +841,12 @@ function HistoryCard({ entry, onReuse }: { entry: HistoryEntry; onReuse: (entry:
   const overwrittenCount = entry.files.filter((file) => file.overwritten).length
     + (entry.orderArchive?.overwritten ? 1 : 0);
   const descriptions = Array.from(
-    new Set(entry.ofs.map((ofBlock) => (ofBlock.description || '').trim()).filter(Boolean))
+    new Set(
+      entry.ofs.flatMap((ofBlock) => {
+        const description = (ofBlock.description || '').trim();
+        return description ? [description] : [];
+      })
+    )
   ).join(' · ');
 
   return (
@@ -891,21 +921,16 @@ function fileLabelFor(entry: HistoryEntry, of: string) {
 }
 
 function ThemeToggle({ mode, onChange }: { mode: ThemeMode; onChange: (mode: ThemeMode) => void }) {
-  const options: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
-    { value: 'light', label: 'Tema claro', icon: <Sun aria-hidden="true" /> },
-    { value: 'system', label: 'Tema del sistema', icon: <Monitor aria-hidden="true" /> },
-    { value: 'dark', label: 'Tema oscuro', icon: <Moon aria-hidden="true" /> }
-  ];
-
   return (
     <div className="theme-toggle" role="radiogroup" aria-label="Tema de la interfaz">
-      {options.map((option) => (
+      {themeOptions.map((option) => (
         <button
           key={option.value}
           className={mode === option.value ? 'active' : ''}
           type="button"
           role="radio"
           aria-checked={mode === option.value}
+          aria-label={option.label}
           title={option.label}
           onClick={() => onChange(option.value)}
         >
@@ -1116,7 +1141,7 @@ function OfCard({
       )}
 
       <div className="line-editor">
-        <ArticlePicker ref={pickerRef} selected={selectedArticle} onSelect={setSelectedArticle} />
+        <ArticlePicker ref={pickerRef} onSelect={setSelectedArticle} />
         <label className="field quantity-field">
           <span>Cantidad</span>
           <input
@@ -1165,12 +1190,14 @@ type ArticlePickerHandle = {
   typedArticle: () => Article | null;
 };
 
-const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
-  selected: Article | null;
+function ArticlePicker({
+  onSelect,
+  ref
+}: {
   onSelect: (article: Article) => void;
-}>(({ selected, onSelect }, ref) => {
+  ref?: React.Ref<ArticlePickerHandle>;
+}) {
   const [query, setQuery] = useState('');
-  const [debounced, setDebounced] = useState('');
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -1182,7 +1209,6 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
   React.useImperativeHandle(ref, () => ({
     clear() {
       setQuery('');
-      setDebounced('');
       setArticles([]);
       setIsOpen(false);
     },
@@ -1193,53 +1219,45 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
   }), [query]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(query.trim()), 180);
-    return () => window.clearTimeout(timer);
-  }, [query]);
-
-  useEffect(() => {
-    if (selected && query !== selected.code) {
-      setQuery(selected.code);
-    }
-  // Intencionado: solo sincronizamos `query` cuando cambia `selected`.
-  // Incluir `query` en deps crearía un bucle de actualización mutua.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
-
-  useEffect(() => {
     if (skipSearchRef.current) {
       skipSearchRef.current = false;
       return;
     }
 
-    if (debounced.length < 2) {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 2) {
       setArticles([]);
       setIsOpen(false);
       return;
     }
 
     const controller = new AbortController();
-    setIsLoading(true);
+    const timer = window.setTimeout(() => {
+      setIsLoading(true);
 
-    fetch(`/api/articles?q=${encodeURIComponent(debounced)}&limit=20`, { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error('search failed');
-        return response.json();
-      })
-      .then((data) => {
-        setArticles(data.articles || []);
-        setIsOpen(true);
-      })
-      .catch((error) => {
-        if (error.name !== 'AbortError') {
-          setArticles([]);
-          setIsOpen(false);
-        }
-      })
-      .finally(() => setIsLoading(false));
+      fetch(`/api/articles?q=${encodeURIComponent(trimmedQuery)}&limit=20`, { signal: controller.signal })
+        .then((response) => {
+          if (!response.ok) throw new Error('search failed');
+          return response.json();
+        })
+        .then((data) => {
+          setArticles(data.articles || []);
+          setIsOpen(true);
+        })
+        .catch((error) => {
+          if (error.name !== 'AbortError') {
+            setArticles([]);
+            setIsOpen(false);
+          }
+        })
+        .finally(() => setIsLoading(false));
+    }, 180);
 
-    return () => controller.abort();
-  }, [debounced]);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
 
   return (
     <label className="field article-search">
@@ -1279,7 +1297,7 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
               >
                 <strong>{article.code}</strong>
                 <span>{formatDisplayText(article.description)}</span>
-                <em>{[article.family, article.subfamily, article.productionSection].filter(Boolean).map(formatDisplayText).join(' · ')}</em>
+                <em>{[article.family, article.subfamily, article.productionSection].flatMap((value) => (value ? [formatDisplayText(value)] : [])).join(' · ')}</em>
               </button>
             ))
           )}
@@ -1287,8 +1305,7 @@ const ArticlePicker = React.forwardRef<ArticlePickerHandle, {
       )}
     </label>
   );
-});
-ArticlePicker.displayName = 'ArticlePicker';
+}
 
 function ArticleCatalog({
   ofs,
@@ -1298,7 +1315,6 @@ function ArticleCatalog({
   onAddLineToOf: (of: string, article: Article, quantity: number) => boolean;
 }) {
   const [filters, setFilters] = useState<CatalogFilterState>(defaultCatalogFilters);
-  const [debouncedFilters, setDebouncedFilters] = useState<CatalogFilterState>(defaultCatalogFilters);
   const [filterOptions, setFilterOptions] = useState<ArticleFilters>({
     family: [],
     subfamily: [],
@@ -1307,7 +1323,6 @@ function ArticleCatalog({
   });
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const catalogLimit = 180;
 
   useEffect(() => {
     const params = new URLSearchParams({
@@ -1321,11 +1336,10 @@ function ArticleCatalog({
         if (!response.ok) throw new Error('filters failed');
         return response.json();
       })
-      .then((data) => setFilterOptions(data.filters || filterOptions))
-      .catch(() => setFilterOptions(filterOptions));
-  // `filterOptions` se usa solo como valor de fallback si la petición falla;
-  // incluirla en deps dispararía el fetch en cada actualización de opciones.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      .then((data) => {
+        if (data.filters) setFilterOptions(data.filters);
+      })
+      .catch(() => undefined);
   }, [filters.family, filters.subfamily, filters.includeOmitted]);
 
   useEffect(() => {
@@ -1359,38 +1373,38 @@ function ArticleCatalog({
   }, [filterOptions]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedFilters(filters), 220);
-    return () => window.clearTimeout(timer);
-  }, [filters]);
-
-  useEffect(() => {
     const controller = new AbortController();
-    const params = new URLSearchParams({
-      q: debouncedFilters.q,
-      family: debouncedFilters.family,
-      subfamily: debouncedFilters.subfamily,
-      unit: debouncedFilters.unit,
-      productionSection: debouncedFilters.productionSection,
-      active: String(debouncedFilters.active),
-      hideBlocked: String(debouncedFilters.hideBlocked),
-      includeOmitted: String(debouncedFilters.includeOmitted),
-      limit: String(catalogLimit)
-    });
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({
+        q: filters.q,
+        family: filters.family,
+        subfamily: filters.subfamily,
+        unit: filters.unit,
+        productionSection: filters.productionSection,
+        active: String(filters.active),
+        hideBlocked: String(filters.hideBlocked),
+        includeOmitted: String(filters.includeOmitted),
+        limit: String(catalogLimit)
+      });
 
-    setIsLoading(true);
-    fetch(`/api/article-list?${params.toString()}`, { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error('article list failed');
-        return response.json();
-      })
-      .then((data) => setArticles(data.articles || []))
-      .catch((error) => {
-        if (error.name !== 'AbortError') setArticles([]);
-      })
-      .finally(() => setIsLoading(false));
+      setIsLoading(true);
+      fetch(`/api/article-list?${params.toString()}`, { signal: controller.signal })
+        .then((response) => {
+          if (!response.ok) throw new Error('article list failed');
+          return response.json();
+        })
+        .then((data) => setArticles(data.articles || []))
+        .catch((error) => {
+          if (error.name !== 'AbortError') setArticles([]);
+        })
+        .finally(() => setIsLoading(false));
+    }, 220);
 
-    return () => controller.abort();
-  }, [debouncedFilters]);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [filters]);
 
   function updateFilter<K extends keyof CatalogFilterState>(key: K, value: CatalogFilterState[K]) {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -1540,9 +1554,9 @@ function SkeletonRows() {
   return (
     <>
       {skeletonWidths.map((row, rowIndex) => (
-        <tr className="skeleton-row" key={rowIndex} aria-hidden="true">
+        <tr className="skeleton-row" key={rowIndex}>
           {row.map((width, cellIndex) => (
-            <td key={cellIndex}>
+            <td key={cellIndex} aria-label="Cargando">
               <span className="skeleton-bar" style={{ width }} />
             </td>
           ))}
@@ -1611,7 +1625,7 @@ function FilterSelect({
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                autoFocus
+                aria-label={`Buscar ${label.toLocaleLowerCase('es-ES')}`}
               />
             </div>
           )}
@@ -1667,7 +1681,13 @@ function ArticleRow({
   onAddLineToOf: (of: string, article: Article, quantity: number) => boolean;
 }) {
   const [quantity, setQuantity] = useState('');
-  const writtenOfs = useMemo(() => ofs.map((ofBlock) => ofBlock.of.trim()).filter(Boolean), [ofs]);
+  const writtenOfs = useMemo(
+    () => ofs.flatMap((ofBlock) => {
+      const of = ofBlock.of.trim();
+      return of ? [of] : [];
+    }),
+    [ofs]
+  );
   const [selectedOf, setSelectedOf] = useState('');
   const [newOf, setNewOf] = useState('');
   const isNewOf = selectedOf === '__new__';
@@ -1811,7 +1831,12 @@ function MaterialTable({
                   <QuantityCell line={line} onCommit={(value) => onUpdateQuantity(line.id, value)} />
                 </td>
                 <td>
-                  <button className="remove-line" type="button" onClick={() => onRemoveLine(ofBlock.id, line.id)}>
+                  <button
+                    className="remove-line"
+                    type="button"
+                    onClick={() => onRemoveLine(ofBlock.id, line.id)}
+                    aria-label={`Quitar ${line.code}`}
+                  >
                     <Trash2 aria-hidden="true" />
                   </button>
                 </td>
@@ -1900,7 +1925,7 @@ function detectOrderYear(orderCode: string): number | null {
 }
 
 function formatNumber(value: number) {
-  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 6 }).format(value || 0);
+  return numberFormatter.format(value || 0);
 }
 
 function formatDisplayText(value?: string | null) {

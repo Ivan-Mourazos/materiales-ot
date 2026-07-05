@@ -150,9 +150,9 @@ app.post('/api/export/save', async (req, res, next) => {
 
     // Generar todos los libros antes de escribir nada: si algo falla
     // (p. ej. el año del pedido), no queda ningún archivo a medias en la red.
-    for (const target of targets) {
+    await Promise.all(targets.map(async (target) => {
       target.workbook = await buildOfWorkbook(target.ofBlock);
-    }
+    }));
 
     let archiveTarget = null;
     if (config.orderArchiveRoot && reservation.orderCode) {
@@ -172,11 +172,11 @@ app.post('/api/export/save', async (req, res, next) => {
 
     await fs.mkdir(config.exportDirectory, { recursive: true });
 
-    const existing = [];
-    for (const target of targets) {
+    const existing = await Promise.all(targets.map(async (target) => {
       target.exists = await fileExists(target.savedPath);
-      if (target.exists) existing.push(target.filename);
-    }
+      return target.exists ? target.filename : null;
+    })).then((filenames) => filenames.filter(Boolean));
+
     if (archiveTarget) {
       archiveTarget.exists = await fileExists(archiveTarget.savedPath);
       if (archiveTarget.exists) existing.push(`${archiveTarget.filename} (archivo de pedido)`);
@@ -187,20 +187,23 @@ app.post('/api/export/save', async (req, res, next) => {
       return;
     }
 
-    const saved = [];
-    for (const target of targets) {
-      try {
+    const saveResults = await Promise.allSettled(
+      targets.map(async (target) => {
         await writeFileAtomic(target.savedPath, target.workbook);
-      } catch (error) {
-        console.error(error);
-        throw httpError(500, buildPartialSaveMessage(target.filename, saved));
-      }
-      saved.push({
-        of: target.of,
-        filename: target.filename,
-        savedPath: target.savedPath,
-        overwritten: Boolean(target.exists)
-      });
+        return {
+          of: target.of,
+          filename: target.filename,
+          savedPath: target.savedPath,
+          overwritten: Boolean(target.exists)
+        };
+      })
+    );
+
+    const saved = saveResults.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+    const failedIndex = saveResults.findIndex((result) => result.status === 'rejected');
+    if (failedIndex !== -1) {
+      console.error(saveResults[failedIndex].reason);
+      throw httpError(500, buildPartialSaveMessage(targets[failedIndex].filename, saved));
     }
 
     let orderArchive = null;
