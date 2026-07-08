@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
-import { checkDatabase, closeDatabase, listArticleFilters, listArticles, searchArticles } from './db.js';
+import { checkDatabase, closeDatabase, getArticleStockDetails, listArticleFilters, listArticles, searchArticles } from './db.js';
 import { buildOfWorkbook, buildOrderArchiveWorkbook, buildReservationWorkbook } from './excel.js';
 import { appendHistory, listHistory } from './history.js';
 import { normalizeReservation } from './validation.js';
@@ -96,6 +96,20 @@ app.get('/api/article-list', async (req, res, next) => {
   }
 });
 
+app.get('/api/article-stock', async (req, res, next) => {
+  try {
+    const idArticle = String(req.query.idArticle || '').trim();
+    if (!idArticle) {
+      res.status(400).json({ error: 'Falta el artículo.' });
+      return;
+    }
+
+    res.json(await getArticleStockDetails(idArticle));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/export', async (req, res, next) => {
   try {
     const reservation = normalizeReservation(req.body);
@@ -131,7 +145,7 @@ app.post('/api/export/save', async (req, res, next) => {
     const confirmOverwrite = req.body?.confirmOverwrite === true;
 
     const targets = reservation.ofs.map((ofBlock) => {
-      const filename = `${sanitizeOf(ofBlock.of)}.xlsx`;
+      const filename = `${sanitizeOf(ofBlock.of)}.xls`;
       return {
         ofBlock,
         of: ofBlock.of,
@@ -231,6 +245,10 @@ app.post('/api/export/save', async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Ruta de API no disponible. Reinicia el servidor de la web si acabas de actualizar la aplicación.' });
 });
 
 await configureFrontend();

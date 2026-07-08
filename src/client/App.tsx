@@ -12,7 +12,9 @@ import {
   Folder,
   History,
   Info,
+  Layers,
   Loader2,
+  MapPin,
   Monitor,
   Moon,
   PackagePlus,
@@ -49,6 +51,23 @@ type Article = {
   widthWarning?: string | null;
   stockTotal?: number | null;
   stocks?: { warehouseCode: string; warehouse: string; quantity: number }[];
+};
+
+type StockDetailRow = {
+  warehouseCode: string;
+  warehouse: string;
+  locationCode?: string | null;
+  location?: string | null;
+  series?: string | null;
+  quantity: number;
+  lastEntryDate?: string | null;
+  lastMovementDate?: string | null;
+};
+
+type StockDetailResponse = {
+  article: Pick<Article, 'idArticle' | 'code' | 'description'>;
+  total: number;
+  rows: StockDetailRow[];
 };
 
 type MaterialLine = {
@@ -1323,6 +1342,7 @@ function ArticleCatalog({
   });
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [stockArticle, setStockArticle] = useState<Article | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams({
@@ -1498,47 +1518,278 @@ function ArticleCatalog({
                   article={article}
                   ofs={ofs}
                   onAddLineToOf={onAddLineToOf}
+                  onOpenStock={setStockArticle}
                 />
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      {stockArticle && (
+        <StockDetailModal
+          article={stockArticle}
+          onClose={() => setStockArticle(null)}
+        />
+      )}
     </section>
   );
 }
 
-const maxVisibleStocks = 3;
-
-function StockCell({ article }: { article: Article }) {
+function StockCell({ article, onOpenStock }: { article: Article; onOpenStock: (article: Article) => void }) {
   const stocks = article.stocks || [];
 
   if (article.stockTotal === null || article.stockTotal === undefined || stocks.length === 0) {
     return <td className="catalog-stock"><span className="catalog-muted">-</span></td>;
   }
 
-  const visible = stocks.slice(0, maxVisibleStocks);
-  const hidden = stocks.slice(maxVisibleStocks);
   const fullBreakdown = stocks
     .map((item) => `${formatDisplayText(item.warehouse)}: ${formatNumber(item.quantity)}`)
     .join('\n');
 
   return (
     <td className="catalog-stock" title={fullBreakdown}>
-      <strong className={article.stockTotal < 0 ? 'stock-negative' : ''}>
-        {formatNumber(article.stockTotal)}
-      </strong>
-      <span className="stock-places">
-        {visible.map((item) => (
-          <span className="stock-place" key={item.warehouseCode}>
-            <em>{formatDisplayText(item.warehouse)}</em>
-            {formatNumber(item.quantity)}
-          </span>
-        ))}
-        {hidden.length > 0 && <span className="stock-more">+{hidden.length} más</span>}
-      </span>
+      <button
+        className="stock-detail-button"
+        type="button"
+        onClick={() => onOpenStock(article)}
+        title={`Ver stock: ${formatNumber(article.stockTotal)}`}
+      >
+        <Layers aria-hidden="true" />
+        Stock
+      </button>
     </td>
   );
+}
+
+const stockDateFormat = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short' });
+
+function StockDetailModal({ article, onClose }: { article: Article; onClose: () => void }) {
+  const [detail, setDetail] = useState<StockDetailResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedWarehouseKey, setSelectedWarehouseKey] = useState('');
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose();
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setIsLoading(true);
+    setError('');
+    setSelectedWarehouseKey('');
+
+    const params = new URLSearchParams({ idArticle: article.idArticle });
+    fetch(`/api/article-stock?${params.toString()}`, { signal: controller.signal })
+      .then(readStockResponse)
+      .then((data) => {
+        setDetail(data);
+        setSelectedWarehouseKey(defaultWarehouseKey(data.rows || []));
+      })
+      .catch((fetchError) => {
+        if (fetchError.name !== 'AbortError') {
+          setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar el detalle de stock.');
+        }
+      })
+      .finally(() => setIsLoading(false));
+
+    return () => controller.abort();
+  }, [article.idArticle]);
+
+  const rows = detail?.rows || [];
+  const warehouses = getWarehouseStockSummary(rows);
+  const selectedWarehouse = warehouses.find((warehouse) => warehouse.key === selectedWarehouseKey) || warehouses[0];
+  const selectedRows = selectedWarehouse
+    ? rows.filter((row) => warehouseKey(row) === selectedWarehouse.key)
+    : [];
+  const locationCount = distinctCount(selectedRows.map((row) => row.locationCode || row.location || 'Sin ubicación'));
+  const seriesCount = distinctCount(selectedRows.map((row) => row.series).filter(Boolean));
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className="modal stock-detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stock-detail-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="stock-detail-head">
+          <div className="modal-icon stock-detail-icon">
+            <MapPin aria-hidden="true" />
+          </div>
+          <div>
+            <h2 id="stock-detail-title">Stock de {article.code}</h2>
+            <p>{formatDisplayText(article.description) || 'Artículo sin descripción'}</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} title="Cerrar">
+            <X aria-hidden="true" />
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="stock-detail-state">
+            <Loader2 className="spin" aria-hidden="true" />
+            Cargando stock...
+          </div>
+        ) : error ? (
+          <div className="stock-detail-state error">{error}</div>
+        ) : rows.length === 0 ? (
+          <div className="stock-detail-state">No hay stock registrado para este artículo.</div>
+        ) : (
+          <>
+            <div className="stock-detail-summary">
+              <span><strong>{formatNumber(detail?.total || 0)}</strong> total</span>
+              <span><strong>{warehouses.length}</strong> {warehouses.length === 1 ? 'sede' : 'sedes'}</span>
+              <span><strong>{formatNumber(selectedWarehouse?.quantity || 0)}</strong> {formatDisplayText(selectedWarehouse?.warehouse) || 'sede'}</span>
+              <span><strong>{seriesCount || '-'}</strong> {seriesCount === 1 ? 'paño' : 'paños'}</span>
+            </div>
+
+            <div className="stock-detail-grid">
+              <div className="stock-detail-table-wrap warehouses">
+                <table className="stock-detail-table warehouse-table">
+                  <thead>
+                    <tr>
+                      <th>Almacén</th>
+                      <th>Descripción</th>
+                      <th>Stock</th>
+                      <th>Disponible</th>
+                      <th>Paños</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {warehouses.map((warehouse) => (
+                      <tr
+                        className={warehouse.key === selectedWarehouse?.key ? 'selected' : ''}
+                        key={warehouse.key}
+                        onClick={() => setSelectedWarehouseKey(warehouse.key)}
+                      >
+                        <td>{warehouse.warehouseCode}</td>
+                        <td><strong>{formatDisplayText(warehouse.warehouse)}</strong></td>
+                        <td>{formatNumber(warehouse.quantity)}</td>
+                        <td>{formatNumber(warehouse.quantity)}</td>
+                        <td>{warehouse.seriesCount || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="stock-series-panel">
+                <div className="stock-series-title">
+                  <strong>{formatDisplayText(selectedWarehouse?.warehouse) || 'Sin sede'}</strong>
+                  <span>{formatNumber(selectedWarehouse?.quantity || 0)} disponibles · {locationCount || '-'} {locationCount === 1 ? 'ubicación' : 'ubicaciones'}</span>
+                </div>
+                <div className="stock-detail-table-wrap series">
+                  <table className="stock-detail-table series-table">
+                    <thead>
+                      <tr>
+                        <th>Serie</th>
+                        <th>Ubicación</th>
+                        <th>Stock</th>
+                        <th>Disponible</th>
+                        <th>Última entrada</th>
+                        <th>Último mov.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedRows.map((row, index) => (
+                        <tr key={`${row.warehouseCode}-${row.locationCode || 'none'}-${row.series || 'none'}-${index}`}>
+                          <td><strong>{row.series || '-'}</strong></td>
+                          <td>
+                            <strong>{formatDisplayText(row.location || row.locationCode) || 'Sin ubicación'}</strong>
+                            {row.locationCode && row.location && <span>{row.locationCode}</span>}
+                          </td>
+                          <td className={row.quantity < 0 ? 'stock-negative' : ''}>{formatNumber(row.quantity)}</td>
+                          <td className={row.quantity < 0 ? 'stock-negative' : ''}>{formatNumber(row.quantity)}</td>
+                          <td>{formatStockDate(row.lastEntryDate)}</td>
+                          <td>{formatStockDate(row.lastMovementDate)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+async function readStockResponse(response: Response): Promise<StockDetailResponse> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('El detalle de stock no está activo en el servidor. Reinicia la web para cargar la API nueva.');
+  }
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'No se pudo cargar el detalle de stock.');
+  }
+
+  return data;
+}
+
+function getWarehouseStockSummary(rows: StockDetailRow[]) {
+  const warehouses = new Map<string, {
+    key: string;
+    warehouseCode: string;
+    warehouse: string;
+    quantity: number;
+    seriesCount: number;
+  }>();
+  const seriesByWarehouse = new Map<string, Set<string>>();
+
+  for (const row of rows) {
+    const key = warehouseKey(row);
+    const current = warehouses.get(key) || {
+      key,
+      warehouseCode: row.warehouseCode,
+      warehouse: row.warehouse,
+      quantity: 0,
+      seriesCount: 0
+    };
+
+    current.quantity = roundQuantity(current.quantity + row.quantity);
+    warehouses.set(key, current);
+
+    if (row.series) {
+      const series = seriesByWarehouse.get(key) || new Set<string>();
+      series.add(row.series);
+      seriesByWarehouse.set(key, series);
+    }
+  }
+
+  return Array.from(warehouses.values())
+    .map((warehouse) => ({
+      ...warehouse,
+      seriesCount: seriesByWarehouse.get(warehouse.key)?.size || 0
+    }))
+    .sort((a, b) => b.quantity - a.quantity || a.warehouse.localeCompare(b.warehouse, 'es'));
+}
+
+function defaultWarehouseKey(rows: StockDetailRow[]) {
+  return getWarehouseStockSummary(rows)[0]?.key || '';
+}
+
+function warehouseKey(row: Pick<StockDetailRow, 'warehouseCode' | 'warehouse'>) {
+  return `${row.warehouseCode}||${row.warehouse}`;
+}
+
+function distinctCount(values: Array<string | null | undefined>) {
+  return new Set(values.map((value) => String(value || '').trim()).filter(Boolean)).size;
+}
+
+function formatStockDate(value?: string | null) {
+  return value ? stockDateFormat.format(new Date(value)) : '-';
 }
 
 const skeletonWidths = [
@@ -1674,11 +1925,13 @@ function FilterSelect({
 function ArticleRow({
   article,
   ofs,
-  onAddLineToOf
+  onAddLineToOf,
+  onOpenStock
 }: {
   article: Article;
   ofs: OfBlock[];
   onAddLineToOf: (of: string, article: Article, quantity: number) => boolean;
+  onOpenStock: (article: Article) => void;
 }) {
   const [quantity, setQuantity] = useState('');
   const writtenOfs = useMemo(
@@ -1706,6 +1959,7 @@ function ArticleRow({
 
   const isBlocked = article.blockedPurchase || article.blockedManufacturing;
   const showProductLine = article.productLine && !article.productLine.toLowerCase().startsWith('creado en traspaso');
+  const showWidth = shouldShowWidth(article);
 
   return (
     <tr>
@@ -1724,12 +1978,15 @@ function ArticleRow({
       </td>
       <td className="catalog-unit" title={formatDisplayText(article.unitDescription)}>{article.unitCode || '-'}</td>
       <td className="catalog-width">
-        <span className={article.widthWarning ? 'width-warning' : ''}>
-          {article.detectedWidth ? `${article.detectedWidth}` : '-'}
+        <span
+          className={article.widthWarning ? 'width-warning' : ''}
+          title={!showWidth && article.detectedWidth ? `Ya indicado en unidad ${article.unitCode}` : undefined}
+        >
+          {showWidth && article.detectedWidth ? `${article.detectedWidth}` : '-'}
         </span>
         {article.widthWarning && <AlertTriangle aria-label={article.widthWarning} />}
       </td>
-      <StockCell article={article} />
+      <StockCell article={article} onOpenStock={onOpenStock} />
       <td className="catalog-section">{formatDisplayText(article.productionSection) || '-'}</td>
       <td>
         <span className={`status-chip ${!article.isActive ? 'inactive' : isBlocked ? 'blocked' : 'active'}`}>
@@ -1910,6 +2167,19 @@ function buildMaterialLine(article: Article, quantity: number): MaterialLine {
     width: article.detectedWidth ?? null,
     widthWarning: article.widthWarning ?? null
   };
+}
+
+function shouldShowWidth(article: Article) {
+  if (!article.detectedWidth) return false;
+  if (article.widthWarning) return true;
+
+  const unitWidth = widthFromUnitCode(article.unitCode);
+  return unitWidth !== article.detectedWidth;
+}
+
+function widthFromUnitCode(unitCode?: string | null) {
+  const match = String(unitCode || '').trim().match(/^ML\s*(\d{2,3})$/i);
+  return match ? Number(match[1]) : null;
 }
 
 function roundQuantity(value: number) {

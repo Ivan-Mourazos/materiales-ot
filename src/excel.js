@@ -32,33 +32,7 @@ export async function buildReservationWorkbook(reservation) {
 }
 
 export async function buildOfWorkbook(ofBlock) {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'materiales-ot';
-  workbook.created = new Date();
-
-  const sheet = workbook.addWorksheet('RPS');
-  sheet.properties.showGridLines = true;
-  sheet.columns = [
-    { header: 'OF', key: 'of', width: 12 },
-    { header: 'ARTICULO', key: 'article', width: 18 },
-    { header: 'CANTIDAD', key: 'quantity', width: 12 }
-  ];
-
-  for (const row of buildFinalRows([ofBlock])) {
-    sheet.addRow({
-      of: numericOf(row.of),
-      article: row.code,
-      quantity: row.quantity
-    });
-  }
-
-  sheet.getColumn(1).numFmt = '0';
-  // 'General' en vez de un formato personalizado con '#': Excel muestra el
-  // separador decimal aunque no queden cifras que mostrar detrás (p. ej. "25,").
-  sheet.getColumn(3).numFmt = 'General';
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buffer);
+  return buildRpsImportBuffer(buildFinalRows([ofBlock]));
 }
 
 export async function buildOrderArchiveWorkbook(reservation) {
@@ -148,6 +122,29 @@ function buildFinalRows(ofs) {
 function numericOf(value) {
   const numeric = Number(String(value).trim());
   return Number.isFinite(numeric) ? numeric : String(value).trim();
+}
+
+function buildRpsImportBuffer(rows) {
+  const lines = [
+    ['OF', 'ARTICULO', 'CANTIDAD'],
+    ...rows.map((row) => [
+      String(row.of).trim(),
+      row.code,
+      formatQuantityForRps(row.quantity)
+    ])
+  ];
+
+  const content = `${lines.map((line) => line.map(formatTsvCell).join('\t')).join('\r\n')}\r\n`;
+  return Buffer.from(content, 'latin1');
+}
+
+function formatTsvCell(value) {
+  return String(value ?? '').replace(/[\t\r\n]+/g, ' ').trim();
+}
+
+function formatQuantityForRps(value) {
+  return String(roundQuantity(value))
+    .replace('.', ',');
 }
 
 function roundQuantity(value) {

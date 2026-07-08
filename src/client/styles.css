@@ -1375,6 +1375,34 @@ select:focus {
   font-weight: 550;
 }
 
+.stock-detail-button {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  border: 1px solid var(--accent-border);
+  border-radius: 7px;
+  padding: 4px 8px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 650;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.stock-detail-button:hover {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+
+.stock-detail-button svg {
+  width: 13px;
+  height: 13px;
+}
+
 .catalog-add-cell {
   background: var(--surface-2);
 }
@@ -1705,6 +1733,229 @@ select:focus {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.stock-detail-modal {
+  width: min(920px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.stock-detail-head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 38px;
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.stock-detail-icon {
+  margin-bottom: 0;
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.stock-detail-head h2 {
+  margin-top: 1px;
+}
+
+.stock-detail-head p {
+  margin-bottom: 0;
+}
+
+.stock-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.stock-detail-summary span {
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  padding: 8px 10px;
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.stock-detail-summary strong {
+  color: var(--ink);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-detail-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 180px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-m);
+  color: var(--ink-3);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.stock-detail-state.error {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+
+.stock-detail-table-wrap {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+}
+
+.stock-detail-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(140px, 0.9fr) minmax(190px, 1fr);
+  gap: 12px;
+}
+
+.stock-detail-table-wrap.warehouses {
+  max-height: 230px;
+}
+
+.stock-series-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+}
+
+.stock-series-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.stock-series-title strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-series-title span {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stock-detail-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.stock-detail-table th,
+.stock-detail-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.stock-detail-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stock-detail-table tbody tr:nth-child(even) {
+  background: var(--stripe);
+}
+
+.warehouse-table tbody tr {
+  cursor: pointer;
+}
+
+.warehouse-table tbody tr:hover {
+  background: var(--row-hover);
+}
+
+.warehouse-table tbody tr.selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.warehouse-table tbody tr.selected td {
+  color: var(--accent-ink);
+}
+
+.stock-detail-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.stock-detail-table td strong,
+.stock-detail-table td span {
+  display: block;
+}
+
+.stock-detail-table td strong {
+  font-weight: 620;
+}
+
+.stock-detail-table td span {
+  margin-top: 2px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.warehouse-table td:nth-child(1),
+.warehouse-table td:nth-child(3),
+.warehouse-table td:nth-child(4),
+.warehouse-table td:nth-child(5),
+.series-table td:nth-child(1),
+.series-table td:nth-child(3),
+.series-table td:nth-child(4),
+.series-table td:nth-child(5),
+.series-table td:nth-child(6) {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.warehouse-table td:nth-child(3),
+.warehouse-table td:nth-child(4),
+.warehouse-table td:nth-child(5),
+.series-table td:nth-child(3),
+.series-table td:nth-child(4) {
+  text-align: right;
+}
+
+.warehouse-table td:nth-child(3),
+.warehouse-table td:nth-child(4),
+.series-table td:nth-child(3),
+.series-table td:nth-child(4) {
+  color: var(--ok-ink);
+  font-weight: 680;
 }
 
 .button-danger {

@@ -254,6 +254,105 @@ async function getStocksForArticles(articleIds) {
   return stocks;
 }
 
+export async function getArticleStockDetails(idArticle) {
+  const cleanId = String(idArticle || '').trim();
+  if (!cleanId) {
+    throw new Error('Artículo no válido.');
+  }
+
+  const pool = await getPool();
+  const request = pool.request();
+  request.input('company', sql.VarChar(10), config.db.company);
+  request.input('idArticle', sql.VarChar(80), cleanId);
+
+  const result = await request.query(`
+    SELECT
+      a.IDArticle AS idArticle,
+      a.CodArticle AS code,
+      a.Description AS description,
+      w.CodWarehouse AS warehouseCode,
+      w.Description AS warehouse,
+      lw.CodLocationWarehouse AS locationCode,
+      lw.Description AS location,
+      s.Series AS series,
+      s.Stock AS quantity,
+      s.LastEntryDate AS lastEntryDate,
+      s.LastMovementDate AS lastMovementDate
+    FROM dbo.STKStock s
+    JOIN dbo.STKArticle a
+      ON a.IDArticle = s.IDArticle
+      AND a.CodCompany = s.CodCompany
+    JOIN dbo.GENWarehouse w
+      ON w.IDWarehouse = s.IDWarehouse
+      AND w.CodCompany = s.CodCompany
+    LEFT JOIN dbo.STKLocationWarehouse lw
+      ON lw.IDLocationWarehouse = s.IDLocationWarehouse
+      AND lw.CodCompany = s.CodCompany
+    WHERE s.CodCompany = @company
+      AND s.IDArticle = @idArticle
+      AND s.Stock <> 0
+      AND w.ClosedDate IS NULL
+      AND (w.InactiveDate IS NULL OR w.InactiveDate > GETDATE())
+    ORDER BY
+      w.Description,
+      lw.CodLocationWarehouse,
+      s.Series,
+      s.LastMovementDate DESC;
+  `);
+
+  const rows = result.recordset.map((row) => ({
+    idArticle: row.idArticle,
+    code: row.code,
+    description: row.description,
+    warehouseCode: row.warehouseCode,
+    warehouse: row.warehouse,
+    locationCode: row.locationCode,
+    location: row.location,
+    series: row.series,
+    quantity: Math.round(Number(row.quantity) * 1000000) / 1000000,
+    lastEntryDate: row.lastEntryDate ? row.lastEntryDate.toISOString() : null,
+    lastMovementDate: row.lastMovementDate ? row.lastMovementDate.toISOString() : null
+  }));
+
+  const article = rows[0]
+    ? {
+      idArticle: rows[0].idArticle,
+      code: rows[0].code,
+      description: rows[0].description
+    }
+    : await getArticleSummary(cleanId);
+  const total = Math.round(rows.reduce((sum, row) => sum + row.quantity, 0) * 1000000) / 1000000;
+
+  return {
+    article,
+    total,
+    rows
+  };
+}
+
+async function getArticleSummary(idArticle) {
+  const pool = await getPool();
+  const request = pool.request();
+  request.input('company', sql.VarChar(10), config.db.company);
+  request.input('idArticle', sql.VarChar(80), idArticle);
+
+  const result = await request.query(`
+    SELECT TOP 1
+      IDArticle AS idArticle,
+      CodArticle AS code,
+      Description AS description
+    FROM dbo.STKArticle
+    WHERE CodCompany = @company
+      AND IDArticle = @idArticle;
+  `);
+
+  return result.recordset[0] || {
+    idArticle,
+    code: idArticle,
+    description: ''
+  };
+}
+
 function attachStocks(articles, stocks) {
   return articles.map((article) => {
     const list = stocks.get(article.idArticle) || [];
