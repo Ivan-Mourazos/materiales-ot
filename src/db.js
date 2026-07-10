@@ -124,7 +124,10 @@ function buildCatalogExclusionCondition() {
   return `
     NULLIF(LTRIM(RTRIM(pf.Description)), '') IS NOT NULL
     AND pf.Description NOT IN (${families})
-    AND pf.Description NOT LIKE '%(VENTAS)%'
+    AND (
+      pf.Description NOT LIKE '%(VENTAS)%'
+      OR a.Description COLLATE Latin1_General_CI_AI LIKE '%DURASKIN%'
+    )
   `;
 }
 
@@ -139,24 +142,24 @@ function buildTokenConditions(searchableText, tokens) {
 function detectWidth(row) {
   const candidates = [];
   const pushWidth = (source, value) => {
-    const width = Number.parseInt(value, 10);
+    const width = Number(String(value).replace(',', '.'));
     if (Number.isFinite(width) && width >= 40 && width <= 600) {
       candidates.push({ source, width });
     }
   };
 
   const unitText = `${row.unitCode || ''} ${row.unitDescription || ''}`;
-  for (const match of unitText.matchAll(/\b(?:ML|ANCHO(?:\s+DE\s+PIEZA)?)\s*[:=-]?\s*(\d{2,3})\b/gi)) {
+  for (const match of unitText.matchAll(/\b(?:ML|ANCHO(?:\s+DE\s+PIEZA)?)\s*[:=-]?\s*(\d{2,3}(?:[,.]\d+)?)\b/gi)) {
     pushWidth('unidad', match[1]);
   }
 
   const codeText = String(row.code || '');
-  for (const match of codeText.matchAll(/\bP\s*(\d{2,3})\b/gi)) {
+  for (const match of codeText.matchAll(/\bP\s*(\d{2,3}(?:[,.]\d+)?)\b/gi)) {
     pushWidth('referencia', match[1]);
   }
 
   const descriptionText = String(row.description || '');
-  for (const match of descriptionText.matchAll(/(?::|\bAN(?:CHO)?\b)\s*(\d{2,3})\b|\b(\d{2,3})\s*(?:CM)?\s*AN\b/gi)) {
+  for (const match of descriptionText.matchAll(/(?::|\bAN(?:CHO)?\b)\s*(\d{2,3}(?:[,.]\d+)?)\b|\b(\d{2,3}(?:[,.]\d+)?)\s*(?:CM)?\s*AN\b/gi)) {
     pushWidth('descripcion', match[1] || match[2]);
   }
 
@@ -164,16 +167,21 @@ function detectWidth(row) {
     return { detectedWidth: null, widthWarning: null };
   }
 
+  // La unidad de ficha es el valor operativo de referencia. La descripción y
+  // el código se contrastan para avisar de posibles discrepancias.
   const orderedSources = ['unidad', 'referencia', 'descripcion'];
   const chosen = orderedSources
     .map((source) => candidates.find((item) => item.source === source))
     .find(Boolean) || candidates[0];
   const uniqueWidths = Array.from(new Set(candidates.map((item) => item.width)));
+  const uniqueCandidates = Array.from(
+    new Map(candidates.map((item) => [`${item.source}::${item.width}`, item])).values()
+  );
 
   return {
     detectedWidth: chosen.width,
     widthWarning: uniqueWidths.length > 1
-      ? `Anchos detectados no coinciden: ${candidates.map((item) => `${item.source} ${item.width}`).join(', ')}`
+      ? `Conflicto de ancho: ${uniqueCandidates.map((item) => `${item.source} ${item.width} cm`).join(', ')}. Se muestra el ancho de la unidad de ficha.`
       : null
   };
 }
@@ -224,6 +232,7 @@ async function getStocksForArticles(articleIds) {
       s.IDArticle AS idArticle,
       w.CodWarehouse AS warehouseCode,
       w.Description AS warehouse,
+      NULLIF(LTRIM(RTRIM(s.Series)), '') AS series,
       SUM(s.Stock) AS quantity
     FROM dbo.STKStock s
     JOIN dbo.GENWarehouse w
@@ -234,8 +243,8 @@ async function getStocksForArticles(articleIds) {
       AND s.Stock <> 0
       AND w.ClosedDate IS NULL
       AND (w.InactiveDate IS NULL OR w.InactiveDate > GETDATE())
-    GROUP BY s.IDArticle, w.CodWarehouse, w.Description
-    ORDER BY s.IDArticle, SUM(s.Stock) DESC
+    GROUP BY s.IDArticle, w.CodWarehouse, w.Description, NULLIF(LTRIM(RTRIM(s.Series)), '')
+    ORDER BY s.IDArticle, w.CodWarehouse, NULLIF(LTRIM(RTRIM(s.Series)), '')
   `);
 
   const stocks = new Map();
@@ -246,7 +255,8 @@ async function getStocksForArticles(articleIds) {
     list.push({
       warehouseCode: row.warehouseCode,
       warehouse: row.warehouse,
-      quantity
+      quantity,
+      series: row.series || null
     });
     stocks.set(row.idArticle, list);
   }
@@ -357,7 +367,31 @@ function attachStocks(articles, stocks) {
   return articles.map((article) => {
     const list = stocks.get(article.idArticle) || [];
     const total = Math.round(list.reduce((sum, item) => sum + item.quantity, 0) * 1000000) / 1000000;
-    return { ...article, stockTotal: list.length ? total : null, stocks: list };
+    const warehouseTotals = new Map();
+    const series = Array.from(new Set(list.map((item) => item.series).filter(Boolean))).sort();
+
+    for (const item of list) {
+      const key = `${item.warehouseCode}||${item.warehouse}`;
+      const current = warehouseTotals.get(key) || {
+        warehouseCode: item.warehouseCode,
+        warehouse: item.warehouse,
+        quantity: 0
+      };
+      current.quantity += item.quantity;
+      warehouseTotals.set(key, current);
+    }
+
+    const warehouseStocks = Array.from(warehouseTotals.values()).map((item) => ({
+      ...item,
+      quantity: Math.round(item.quantity * 1000000) / 1000000
+    }));
+
+    return {
+      ...article,
+      stockTotal: list.length ? total : null,
+      stocks: warehouseStocks,
+      stockSeries: series
+    };
   });
 }
 

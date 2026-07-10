@@ -51,6 +51,7 @@ type Article = {
   widthWarning?: string | null;
   stockTotal?: number | null;
   stocks?: { warehouseCode: string; warehouse: string; quantity: number }[];
+  stockSeries?: string[];
 };
 
 type StockDetailRow = {
@@ -1496,9 +1497,9 @@ function ArticleCatalog({
               <th>Referencia</th>
               <th>Artículo</th>
               <th>Clasificación</th>
-              <th>Unidad</th>
-              <th>Ancho</th>
+              <th>Formato</th>
               <th>Stock</th>
+              <th>Series</th>
               <th>Sección</th>
               <th>Estado</th>
               <th>Añadir a reserva</th>
@@ -1557,6 +1558,30 @@ function StockCell({ article, onOpenStock }: { article: Article; onOpenStock: (a
       >
         <Layers aria-hidden="true" />
         Stock
+      </button>
+    </td>
+  );
+}
+
+function SeriesCell({ article, onOpenStock }: { article: Article; onOpenStock: (article: Article) => void }) {
+  const series = article.stockSeries || [];
+
+  if (series.length === 0) {
+    return <td className="catalog-series"><span className="catalog-muted">-</span></td>;
+  }
+
+  const visible = series.slice(0, 2);
+  const rest = series.length - visible.length;
+  return (
+    <td className="catalog-series">
+      <button
+        className="series-preview"
+        type="button"
+        onClick={() => onOpenStock(article)}
+        title="Ver series, ubicaciones y stock"
+      >
+        {visible.map((seriesNumber) => <span key={seriesNumber}>{seriesNumber}</span>)}
+        {rest > 0 && <em>+{rest} más</em>}
       </button>
     </td>
   );
@@ -1959,8 +1984,6 @@ function ArticleRow({
 
   const isBlocked = article.blockedPurchase || article.blockedManufacturing;
   const showProductLine = article.productLine && !article.productLine.toLowerCase().startsWith('creado en traspaso');
-  const showWidth = shouldShowWidth(article);
-
   return (
     <tr>
       <td className="catalog-reference">
@@ -1976,17 +1999,17 @@ function ArticleRow({
         {article.subfamily && <span className="catalog-chip">{formatDisplayText(article.subfamily)}</span>}
         {!article.family && !article.subfamily && <span className="catalog-muted">-</span>}
       </td>
-      <td className="catalog-unit" title={formatDisplayText(article.unitDescription)}>{article.unitCode || '-'}</td>
-      <td className="catalog-width">
-        <span
-          className={article.widthWarning ? 'width-warning' : ''}
-          title={!showWidth && article.detectedWidth ? `Ya indicado en unidad ${article.unitCode}` : undefined}
-        >
-          {showWidth && article.detectedWidth ? `${article.detectedWidth}` : '-'}
-        </span>
-        {article.widthWarning && <AlertTriangle aria-label={article.widthWarning} />}
+      <td className="catalog-format" title={formatDisplayText(article.unitDescription)}>
+        <strong>{formatUnitLabel(article)}</strong>
+        {article.detectedWidth && (
+          <span className={article.widthWarning ? 'width-warning' : ''} title={article.widthWarning || undefined}>
+            Ancho {formatNumber(article.detectedWidth)} cm
+            {article.widthWarning && <AlertTriangle aria-label={article.widthWarning} />}
+          </span>
+        )}
       </td>
       <StockCell article={article} onOpenStock={onOpenStock} />
+      <SeriesCell article={article} onOpenStock={onOpenStock} />
       <td className="catalog-section">{formatDisplayText(article.productionSection) || '-'}</td>
       <td>
         <span className={`status-chip ${!article.isActive ? 'inactive' : isBlocked ? 'blocked' : 'active'}`}>
@@ -2169,17 +2192,10 @@ function buildMaterialLine(article: Article, quantity: number): MaterialLine {
   };
 }
 
-function shouldShowWidth(article: Article) {
-  if (!article.detectedWidth) return false;
-  if (article.widthWarning) return true;
-
-  const unitWidth = widthFromUnitCode(article.unitCode);
-  return unitWidth !== article.detectedWidth;
-}
-
-function widthFromUnitCode(unitCode?: string | null) {
-  const match = String(unitCode || '').trim().match(/^ML\s*(\d{2,3})$/i);
-  return match ? Number(match[1]) : null;
+function formatUnitLabel(article: Article) {
+  const code = String(article.unitCode || '').trim();
+  if (/^ML\s*\d+(?:[,.]\d+)?$/i.test(code)) return 'Metro lineal';
+  return formatDisplayText(article.unitDescription) || code || '-';
 }
 
 function roundQuantity(value: number) {
