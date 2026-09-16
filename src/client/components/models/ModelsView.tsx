@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Layers, Loader2, Plus, RefreshCw, Search, X } from 'lucide-react';
 import type { AssignmentModel, ModelPart } from '../../types';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 import { ModelCard } from './ModelCard';
 import { ModelEditorModal } from './ModelEditorModal';
 import { ModelTransferModal } from './ModelTransferModal';
@@ -24,6 +25,7 @@ export function ModelsView({
   const [editorOpen, setEditorOpen] = useState(false);
   const [modelToEdit, setModelToEdit] = useState<AssignmentModel | null>(null);
   const [modelToTransfer, setModelToTransfer] = useState<AssignmentModel | null>(null);
+  const [modelToDelete, setModelToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const fetchModels = useCallback(async () => {
     setIsLoading(true);
@@ -81,8 +83,8 @@ export function ModelsView({
     fetchModels();
   }
 
-  async function handleDeleteModel(id: string, name: string) {
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar el modelo "${name}"?`)) return;
+  async function confirmDeleteModel({ id, name }: { id: string; name: string }) {
+    setModelToDelete(null);
 
     try {
       const response = await fetch(`/api/models/${id}`, { method: 'DELETE' });
@@ -194,7 +196,7 @@ export function ModelsView({
                 setEditorOpen(true);
               }}
               onDuplicateModel={handleDuplicateModel}
-              onDeleteModel={handleDeleteModel}
+              onDeleteModel={(id, name) => setModelToDelete({ id, name })}
             />
           ))}
         </div>
@@ -208,6 +210,21 @@ export function ModelsView({
             setModelToEdit(null);
           }}
           onSave={handleSaveModel}
+        />
+      )}
+
+      {modelToDelete && (
+        <ConfirmDialog
+          title="Eliminar modelo"
+          description={
+            <>
+              Se va a eliminar <strong>{modelToDelete.name}</strong> de la biblioteca, con todas sus
+              partes y materiales. Las asignaciones ya generadas no se ven afectadas.
+            </>
+          }
+          confirmLabel="Eliminar modelo"
+          onCancel={() => setModelToDelete(null)}
+          onConfirm={() => confirmDeleteModel(modelToDelete)}
         />
       )}
 

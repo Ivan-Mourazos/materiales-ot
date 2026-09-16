@@ -1,24 +1,37 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { AlertTriangle, FileSpreadsheet } from 'lucide-react';
 
+/** Diálogo de confirmación genérico: sustituye a window.confirm en toda la app. */
 export function ConfirmDialog({
-  files,
+  title,
+  description,
+  items,
+  confirmLabel,
+  cancelLabel = 'Cancelar',
   onCancel,
   onConfirm
 }: {
-  files: string[];
+  title: string;
+  description: ReactNode;
+  items?: string[];
+  confirmLabel: string;
+  cancelLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
+    const opener = document.activeElement;
     if (!dialog) return;
     dialog.showModal();
+    confirmRef.current?.focus();
 
     return () => {
       if (dialog.open) dialog.close();
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
     };
   }, []);
 
@@ -26,7 +39,7 @@ export function ConfirmDialog({
     <dialog
       ref={dialogRef}
       className="modal-overlay"
-      aria-labelledby="overwrite-title"
+      aria-labelledby="confirm-title"
       onCancel={(event) => {
         event.preventDefault();
         onCancel();
@@ -36,25 +49,24 @@ export function ConfirmDialog({
         <div className="modal-icon">
           <AlertTriangle aria-hidden="true" />
         </div>
-        <h2 id="overwrite-title">Ya existen archivos con ese nombre</h2>
-        <p>
-          Estos archivos ya están en la carpeta compartida y se van a <strong>sobrescribir</strong>.
-          Si RPS aún no los procesó, se perderá la asignación anterior.
-        </p>
-        <ul className="modal-files">
-          {files.map((file) => (
-            <li key={file}>
-              <FileSpreadsheet aria-hidden="true" />
-              {file}
-            </li>
-          ))}
-        </ul>
+        <h2 id="confirm-title">{title}</h2>
+        <p>{description}</p>
+        {items && items.length > 0 && (
+          <ul className="modal-files">
+            {items.map((item) => (
+              <li key={item}>
+                <FileSpreadsheet aria-hidden="true" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="modal-actions">
           <button className="button button-muted" type="button" onClick={onCancel}>
-            Cancelar
+            {cancelLabel}
           </button>
-          <button className="button button-danger" type="button" onClick={onConfirm}>
-            Sobrescribir
+          <button className="button button-danger" type="button" ref={confirmRef} onClick={onConfirm}>
+            {confirmLabel}
           </button>
         </div>
       </div>

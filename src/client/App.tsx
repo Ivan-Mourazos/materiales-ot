@@ -585,7 +585,15 @@ function App() {
 
       {overwritePrompt && (
         <ConfirmDialog
-          files={overwritePrompt}
+          title="Ya existen archivos con ese nombre"
+          description={
+            <>
+              Estos archivos ya están en la carpeta compartida y se van a <strong>sobrescribir</strong>.
+              Si RPS aún no los procesó, se perderá la asignación anterior.
+            </>
+          }
+          items={overwritePrompt}
+          confirmLabel="Sobrescribir"
           onCancel={() => setOverwritePrompt(null)}
           onConfirm={() => {
             setOverwritePrompt(null);

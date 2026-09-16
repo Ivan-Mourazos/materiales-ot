@@ -1,0 +1,64 @@
+/* ============================================================
+   Responsive básico (uso principal: escritorio)
+   ============================================================ */
+
+@media (max-width: 960px) {
+  .topbar,
+  .workspace,
+  .line-editor,
+  .catalog-search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px 14px 14px;
+  }
+
+  .topbar-actions {
+    justify-content: space-between;
+  }
+
+  .catalog-panel {
+    position: static;
+  }
+
+  .catalog-table-wrap {
+    max-height: none;
+  }
+
+  .app-tabs {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+
+  .workspace,
+  .catalog-shell {
+    padding: 14px 14px 28px;
+  }
+
+  .summary-panel {
+    position: static;
+  }
+
+  .of-header {
+    grid-template-columns: 1fr 38px;
+  }
+
+  .of-header .of-description {
+    grid-column: 1 / -1;
+  }
+
+  .of-header .icon-button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .toast-viewport {
+    right: 12px;
+    bottom: 12px;
+  }
+}
+

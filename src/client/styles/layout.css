@@ -1,0 +1,209 @@
+/* ============================================================
+   Estructura y cabecera
+   ============================================================ */
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 12px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-translucent);
+  backdrop-filter: blur(16px) saturate(160%);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.brand-logo {
+  height: 32px;
+  width: auto;
+}
+
+.brand-logo-dark {
+  display: none;
+}
+
+:root[data-theme='dark'] .brand-logo-light {
+  display: none;
+}
+
+:root[data-theme='dark'] .brand-logo-dark {
+  display: block;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* --- estado de la base de datos --- */
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 7px 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.status-pill svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.75;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--ink-3);
+}
+
+.status-pill.checking .status-dot {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.status-pill.ok {
+  border-color: var(--ok-border);
+  background: var(--ok-soft);
+  color: var(--ok-ink);
+}
+
+.status-pill.ok .status-dot {
+  background: var(--ok-ink);
+  box-shadow: 0 0 0 3px var(--ok-soft);
+}
+
+.status-pill.error {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+
+.status-pill.error .status-dot {
+  background: var(--danger-ink);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+/* --- selector de tema --- */
+
+.theme-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.theme-toggle button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.theme-toggle button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.theme-toggle button:hover {
+  color: var(--ink);
+}
+
+.theme-toggle button.active {
+  background: var(--surface);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-1);
+}
+
+/* --- pestañas --- */
+
+.app-tabs {
+  width: fit-content;
+  display: flex;
+  gap: 2px;
+  margin: 18px 28px 0;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+}
+
+.app-tabs button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: calc(var(--radius-m) - 3px);
+  padding: 7px 16px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.app-tabs button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.app-tabs button:hover {
+  color: var(--ink);
+}
+
+.app-tabs button.active {
+  background: var(--surface);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-1);
+}
+
+/* --- transición entre vistas --- */
+
+.view {
+  animation: view-in 280ms var(--ease-out);
+}
+

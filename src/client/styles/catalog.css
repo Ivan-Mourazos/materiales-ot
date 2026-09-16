@@ -1,0 +1,684 @@
+/* ============================================================
+   Vista de catálogo
+   ============================================================ */
+
+.catalog-shell {
+  display: grid;
+  gap: 16px;
+  padding: 20px 28px 36px;
+  min-width: 0;
+}
+
+/* --- panel de filtros --- */
+
+.catalog-panel {
+  position: sticky;
+  top: 78px;
+  z-index: 12;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.catalog-search-row {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.25fr) repeat(4, minmax(126px, 0.9fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.catalog-search {
+  min-width: 0;
+}
+
+.catalog-toggles-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.catalog-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Casilla con forma de píldora: sin esto el `input { width: 100% }` global
+   convierte cada checkbox en un cuadrado gigante. */
+.checkbox-field {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+  padding: 6px 12px;
+  background: var(--input-bg);
+  color: var(--ink-2);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  user-select: none;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.checkbox-field:hover {
+  border-color: var(--accent-border);
+}
+
+.checkbox-field:has(input:focus-visible) {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+.checkbox-field:has(input:checked) {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.checkbox-field input {
+  width: 15px;
+  min-height: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.catalog-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.catalog-count {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+/* --- hint del año del pedido --- */
+
+.field span.order-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.field span.order-hint svg {
+  width: 13px;
+  height: 13px;
+}
+
+.field span.order-hint.ok {
+  color: var(--ok-ink);
+}
+
+.field span.order-hint.warn {
+  color: var(--warn-ink);
+}
+
+/* --- desplegables con búsqueda --- */
+
+.apple-select-field {
+  position: relative;
+}
+
+.apple-select-trigger {
+  width: 100%;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+  padding: 8px 11px;
+  background: var(--input-bg);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.apple-select-trigger:hover:not(:disabled) {
+  border-color: var(--accent-border);
+}
+
+.apple-select-trigger.open {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+.apple-select-trigger:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.apple-select-trigger > span {
+  overflow: hidden;
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apple-select-trigger svg {
+  width: 15px;
+  height: 15px;
+  color: var(--ink-3);
+  transition: transform 180ms var(--ease-out);
+}
+
+.apple-select-trigger.open svg {
+  transform: rotate(180deg);
+}
+
+.apple-select-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 220px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+  transform-origin: top;
+  animation: pop-in 160ms var(--ease-out);
+}
+
+.apple-select-search {
+  position: relative;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.apple-select-search svg {
+  position: absolute;
+  top: 50%;
+  left: 18px;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+  color: var(--ink-3);
+  pointer-events: none;
+}
+
+.apple-select-search input {
+  min-height: 32px;
+  padding: 6px 9px 6px 31px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.apple-select-options {
+  max-height: 280px;
+  overflow: auto;
+  padding: 5px;
+}
+
+.apple-select-option {
+  width: 100%;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.apple-select-option:hover {
+  background: var(--surface-3);
+}
+
+.apple-select-option.selected {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.apple-select-option > span {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apple-select-option svg {
+  width: 14px;
+  height: 14px;
+  color: var(--accent-ink);
+}
+
+.apple-select-empty {
+  padding: 14px 10px;
+  color: var(--ink-3);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* --- tabla del catálogo --- */
+
+.catalog-table-wrap {
+  max-height: calc(100vh - 310px);
+  min-height: 280px;
+}
+
+.catalog-table {
+  min-width: 1510px;
+}
+
+.catalog-table th,
+.catalog-table td {
+  padding: 11px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.catalog-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  box-shadow: inset 0 -1px 0 var(--border-strong);
+  white-space: nowrap;
+}
+
+.catalog-table tbody tr:nth-child(even) {
+  background: var(--stripe);
+}
+
+.catalog-table tbody tr:hover {
+  background: var(--row-hover);
+}
+
+.catalog-table th:nth-child(1) {
+  width: 170px;
+}
+
+.catalog-table th:nth-child(2) {
+  min-width: 360px;
+}
+
+.catalog-table th:nth-child(3) {
+  width: 220px;
+}
+
+.catalog-table th:nth-child(4) {
+  width: 145px;
+}
+
+.catalog-table th:nth-child(5) {
+  width: 150px;
+}
+
+.catalog-table th:nth-child(6) {
+  width: 150px;
+}
+
+.catalog-table th:nth-child(7) {
+  width: 150px;
+}
+
+.catalog-table th:nth-child(8) {
+  width: 92px;
+}
+
+.catalog-table th:nth-child(9) {
+  width: 430px;
+}
+
+.catalog-reference strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.catalog-reference span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.catalog-article span {
+  display: block;
+  max-width: 560px;
+  font-size: 13px;
+}
+
+.catalog-article em {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.catalog-chip {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  /* En px, no en %: con `table-layout: auto` un valor relativo deja que la
+     celda crezca y empuje la última columna fuera de la pantalla. */
+  max-width: 196px;
+  min-height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  margin: 2px 5px 2px 0;
+  padding: 3px 9px;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  /* Una familia larga no debe partir el chip en dos líneas: la fila crecería
+     el doble y se ven la mitad de artículos por pantalla. */
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.catalog-chip.strong {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.catalog-muted {
+  color: var(--ink-3);
+}
+
+.catalog-classification {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+.catalog-format {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.catalog-format strong,
+.catalog-format span {
+  display: block;
+}
+
+.catalog-format strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.catalog-format span {
+  margin-top: 2px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.catalog-format .width-warning {
+  color: var(--warn-ink);
+}
+
+.catalog-format svg {
+  width: 13px;
+  height: 13px;
+  margin-left: 4px;
+  vertical-align: -2px;
+}
+
+.catalog-section {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+/* --- existencias y paños en la tabla --- */
+
+.catalog-stock-cell,
+.catalog-series-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-badge-button,
+.series-badge-button {
+  display: inline-flex;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.stock-badge-button:focus-visible,
+.series-badge-button:focus-visible {
+  outline: 0;
+  box-shadow: var(--ring);
+}
+
+.stock-badge,
+.series-badge {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 650;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.stock-badge svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0.8;
+}
+
+.stock-badge.positive {
+  border-color: var(--ok-border);
+  background: var(--ok-soft);
+  color: var(--ok-ink);
+}
+
+.stock-badge.zero {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+  color: var(--ink-3);
+}
+
+.stock-badge.negative {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+
+.series-badge {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.stock-badge-button:hover .stock-badge,
+.series-badge-button:hover .series-badge {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+
+.catalog-series-cell.muted,
+.muted {
+  color: var(--ink-3);
+}
+
+/* La columna de acción queda fijada a la derecha: la tabla es más ancha que
+   muchas pantallas y "Añadir" no puede quedar fuera de vista. */
+.catalog-table th:last-child,
+.catalog-add-cell {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: var(--surface-2);
+  box-shadow: inset 1px 0 0 var(--border);
+}
+
+.catalog-table th:last-child {
+  z-index: 3;
+  background: var(--surface);
+  /* Conserva la línea inferior de la cabecera y añade la separación lateral */
+  box-shadow: inset 0 -1px 0 var(--border-strong), inset 1px 0 0 var(--border);
+}
+
+/* Opaca también al pasar el ratón: al ser sticky, el transparente dejaría ver
+   las columnas que pasan por debajo. */
+.catalog-table tbody tr:hover .catalog-add-cell {
+  background: var(--row-hover);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.status-chip.active {
+  background: var(--ok-soft);
+  color: var(--ok-ink);
+}
+
+.status-chip.blocked {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+
+.status-chip.inactive {
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+
+/* --- añadir desde el catálogo --- */
+
+.row-add {
+  display: grid;
+  grid-template-columns: minmax(152px, 1fr) 84px 102px;
+  gap: 8px;
+  align-items: end;
+}
+
+.row-add:has(.new-of) {
+  grid-template-columns: minmax(126px, 1fr) minmax(112px, 1fr) 76px 102px;
+}
+
+.row-add-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.row-add-field span {
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.row-add-field input,
+.row-add-field select {
+  min-height: 33px;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+
+.row-add-button {
+  min-height: 33px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-s);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease, transform 100ms ease;
+}
+
+.row-add-button:hover {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+
+.row-add-button:active {
+  transform: translateY(1px);
+}
+
+.row-add-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* --- avisos de ancho --- */
+
+.width-warning {
+  color: var(--warn-ink);
+  font-weight: 650;
+}
+
+.catalog-table td > svg {
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  color: var(--warn-ink);
+  vertical-align: -2px;
+}
+
+/* --- skeleton de carga --- */
+
+.skeleton-row td {
+  padding: 15px 14px;
+}
+
+.skeleton-bar {
+  display: inline-block;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--surface-3) 25%, var(--surface-2) 45%, var(--surface-3) 65%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+

@@ -29,15 +29,29 @@ export function FilterSelect({
   useEffect(() => {
     if (!isOpen) return;
 
+    function cerrar() {
+      setIsOpen(false);
+      setQuery('');
+    }
+
     function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-        setQuery('');
-      }
+      if (!rootRef.current?.contains(event.target as Node)) cerrar();
+    }
+
+    // Escape cierra el desplegable y devuelve el foco al botón que lo abrió
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      cerrar();
+      rootRef.current?.querySelector<HTMLButtonElement>('.apple-select-trigger')?.focus();
     }
 
     document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen]);
 
   return (
