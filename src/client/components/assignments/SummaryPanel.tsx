@@ -1,4 +1,4 @@
-import { AlertTriangle, BookmarkPlus, Check, Layers, Loader2, Plus, Save, X } from 'lucide-react';
+import { AlertTriangle, BookmarkPlus, Check, FileClock, Layers, Loader2, Plus, Save, X } from 'lucide-react';
 import { detectOrderYear, formatNumber } from '../../utils';
 
 export function SummaryPanel({
@@ -6,7 +6,9 @@ export function SummaryPanel({
   setOrderCode,
   totals,
   isSavingToNetwork,
+  activeDraft,
   onSave,
+  onOpenSaveDraft,
   onAddOf,
   onOpenLoadModel,
   onOpenSaveAsModel,
@@ -16,7 +18,9 @@ export function SummaryPanel({
   setOrderCode: (value: string) => void;
   totals: { ofs: number; lines: number; units: number };
   isSavingToNetwork: boolean;
+  activeDraft?: { id: string; name: string } | null;
   onSave: () => void;
+  onOpenSaveDraft: () => void;
   onAddOf: () => void;
   onOpenLoadModel: () => void;
   onOpenSaveAsModel: () => void;
@@ -69,6 +73,21 @@ export function SummaryPanel({
         >
           {isSavingToNetwork ? <Loader2 className="spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
           {isSavingToNetwork ? 'Generando…' : 'Generar asignación'}
+        </button>
+
+        <button
+          className="button button-muted"
+          type="button"
+          onClick={onOpenSaveDraft}
+          disabled={totals.lines === 0 && !hasOrderCode}
+          title={
+            totals.lines === 0 && !hasOrderCode
+              ? 'Introduce un pedido o añade materiales para guardar como borrador'
+              : 'Guardar este pedido a medias para continuar más tarde'
+          }
+        >
+          <FileClock aria-hidden="true" />
+          {activeDraft ? 'Actualizar borrador' : 'Guardar borrador'}
         </button>
 
         <button className="button button-muted" type="button" onClick={onOpenLoadModel}>

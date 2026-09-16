@@ -1,3 +1,4 @@
+import { FileClock, Save, X } from 'lucide-react';
 import type { Article, OfBlock } from '../../types';
 import { OfCard } from './OfCard';
 import { SummaryPanel } from './SummaryPanel';
@@ -9,7 +10,11 @@ export function AssignmentWorkspace({
   totals,
   duplicateOfs,
   isSavingToNetwork,
+  activeDraft,
   onSave,
+  onOpenSaveDraft,
+  onQuickSaveDraft,
+  onClearActiveDraft,
   onAddOf,
   onOpenLoadModel,
   onOpenSaveAsModel,
@@ -27,7 +32,11 @@ export function AssignmentWorkspace({
   totals: { ofs: number; lines: number; units: number };
   duplicateOfs: Set<string>;
   isSavingToNetwork: boolean;
+  activeDraft?: { id: string; name: string } | null;
   onSave: () => void;
+  onOpenSaveDraft: () => void;
+  onQuickSaveDraft?: () => void;
+  onClearActiveDraft?: () => void;
   onAddOf: () => void;
   onOpenLoadModel: () => void;
   onOpenSaveAsModel: () => void;
@@ -46,7 +55,9 @@ export function AssignmentWorkspace({
         setOrderCode={setOrderCode}
         totals={totals}
         isSavingToNetwork={isSavingToNetwork}
+        activeDraft={activeDraft}
         onSave={onSave}
+        onOpenSaveDraft={onOpenSaveDraft}
         onAddOf={onAddOf}
         onOpenLoadModel={onOpenLoadModel}
         onOpenSaveAsModel={onOpenSaveAsModel}
@@ -54,6 +65,48 @@ export function AssignmentWorkspace({
       />
 
       <section className="of-list">
+        {activeDraft && (
+          <div className="active-draft-banner">
+            <div className="active-draft-info">
+              <FileClock aria-hidden="true" />
+              <span>
+                Editando borrador: <strong>{activeDraft.name}</strong>
+              </span>
+            </div>
+            <div className="active-draft-actions">
+              {onQuickSaveDraft && (
+                <button
+                  className="button button-primary"
+                  type="button"
+                  onClick={onQuickSaveDraft}
+                  title="Guardar los cambios actuales en este borrador"
+                >
+                  <Save size={14} aria-hidden="true" />
+                  Guardar cambios
+                </button>
+              )}
+              <button
+                className="button button-muted"
+                type="button"
+                onClick={onOpenSaveDraft}
+                title="Opciones de guardado / Cambiar nombre"
+              >
+                Opciones
+              </button>
+              {onClearActiveDraft && (
+                <button
+                  className="icon-button"
+                  type="button"
+                  onClick={onClearActiveDraft}
+                  title="Desvincular borrador (mantener materiales en asignación actual)"
+                  aria-label="Desvincular borrador"
+                >
+                  <X size={15} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         {ofs.map((ofBlock, index) => (
           <OfCard
             key={ofBlock.id}

@@ -10,6 +10,7 @@ import type {
   HistoryEntry,
   ModelPart,
   OfBlock,
+  OrderDraft,
   PersistedState,
   ThemeMode,
   Toast,
@@ -27,6 +28,8 @@ import { ToastViewport } from './components/common/ToastViewport';
 import { HistoryView } from './components/history/HistoryView';
 import { ModelsView } from './components/models/ModelsView';
 import { SaveAsModelModal } from './components/models/SaveAsModelModal';
+import { DraftsView } from './components/drafts/DraftsView';
+import { SaveDraftModal } from './components/drafts/SaveDraftModal';
 
 const storageKey = 'materiales-ot-state-v3';
 const themeStorageKey = 'materiales-ot-theme';
@@ -121,6 +124,14 @@ function App() {
   const [overwritePrompt, setOverwritePrompt] = useState<string[] | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [isSaveAsModelOpen, setIsSaveAsModelOpen] = useState(false);
+  const [modelModalOfs, setModelModalOfs] = useState<OfBlock[] | null>(null);
+
+  // Borradores de pedidos
+  const [activeDraft, setActiveDraft] = useState<{ id: string; name: string; notes?: string; orderCode?: string } | null>(null);
+  const [isSaveDraftOpen, setIsSaveDraftOpen] = useState(false);
+  const [draftsVersion, setDraftsVersion] = useState(0);
+  const [draftsCount, setDraftsCount] = useState(0);
+  const [pendingDraftToResume, setPendingDraftToResume] = useState<OrderDraft | null>(null);
 
   const [, startTransition] = useTransition();
   const { mode: themeMode, setMode: setThemeMode } = useTheme();
@@ -129,6 +140,21 @@ function App() {
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({ orderCode, ofs }));
   }, [orderCode, ofs]);
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/drafts')
+      .then((res) => res.json())
+      .then((data) => {
+        if (alive && Array.isArray(data.drafts)) {
+          setDraftsCount(data.drafts.length);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [draftsVersion]);
 
   useEffect(() => {
     let alive = true;
@@ -288,6 +314,134 @@ function App() {
     pushToast(`Modelo "${modelData.name}" guardado con éxito en la biblioteca.`, 'ok');
   }
 
+  function resumeDraft(draft: OrderDraft, force = false) {
+    const hasContent =
+      Boolean(orderCode.trim()) ||
+      ofs.some((b) => b.of.trim() || b.materials.length > 0);
+    const isSameAsActive = activeDraft?.id === draft.id;
+
+    if (hasContent && !isSameAsActive && !force) {
+      setPendingDraftToResume(draft);
+      return;
+    }
+
+    const previousSnapshot = { orderCode, ofs, activeDraft };
+    const restoredOfs: OfBlock[] = draft.ofs.map((block) => ({
+      id: block.id || uid(),
+      of: block.of || '',
+      description: block.description || '',
+      materials: block.materials.map((m) => ({
+        id: m.id || uid(),
+        code: m.code,
+        description: m.description || '',
+        quantity: roundQuantity(m.quantity),
+        width: m.width ?? null,
+        widthWarning: m.widthWarning ?? null
+      }))
+    }));
+
+    setOrderCode(draft.orderCode || '');
+    setOfs(restoredOfs.length > 0 ? restoredOfs : [createOf()]);
+    setActiveDraft({
+      id: draft.id,
+      name: draft.name,
+      notes: draft.notes,
+      orderCode: draft.orderCode
+    });
+    setActiveTab('assignments');
+    pushToast(`Borrador "${draft.name}" cargado. Puedes continuar editando el pedido.`, 'ok', {
+      label: 'Deshacer',
+      run: () => {
+        setOrderCode(previousSnapshot.orderCode);
+        setOfs(previousSnapshot.ofs);
+        setActiveDraft(previousSnapshot.activeDraft);
+      }
+    });
+  }
+
+  async function handleQuickSaveDraft() {
+    if (!activeDraft?.id) {
+      setIsSaveDraftOpen(true);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/drafts/${activeDraft.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: activeDraft.id,
+          name: activeDraft.name,
+          orderCode,
+          notes: activeDraft.notes,
+          ofs
+        })
+      });
+
+      if (!response.ok) throw new Error('No se pudo actualizar el borrador.');
+      setDraftsVersion((v) => v + 1);
+      pushToast(`Borrador "${activeDraft.name}" actualizado con éxito.`, 'ok');
+    } catch (err) {
+      pushToast(err instanceof Error ? err.message : 'Error al guardar el borrador.', 'error');
+    }
+  }
+
+  async function handleSaveDraftModal(data: {
+    id?: string;
+    name: string;
+    orderCode: string;
+    notes?: string;
+    ofs: OfBlock[];
+  }) {
+    const isUpdating = Boolean(data.id);
+    const url = isUpdating ? `/api/drafts/${data.id}` : '/api/drafts';
+    const method = isUpdating ? 'PUT' : 'POST';
+
+    const response = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'No se pudo guardar el borrador.');
+    }
+
+    const savedData = await response.json();
+    const savedDraft = savedData.draft;
+
+    setActiveDraft({
+      id: savedDraft.id,
+      name: savedDraft.name,
+      notes: savedDraft.notes,
+      orderCode: savedDraft.orderCode
+    });
+    setDraftsVersion((v) => v + 1);
+    pushToast(
+      isUpdating
+        ? `Borrador "${savedDraft.name}" actualizado con éxito.`
+        : `Borrador "${savedDraft.name}" guardado.`,
+      'ok'
+    );
+  }
+
+  function handleDraftToModel(draft: OrderDraft) {
+    const draftOfs: OfBlock[] = draft.ofs.map((block) => ({
+      id: block.id || uid(),
+      of: block.of || '',
+      description: block.description || '',
+      materials: block.materials.map((m) => ({ ...m }))
+    }));
+    setModelModalOfs(draftOfs);
+    setIsSaveAsModelOpen(true);
+  }
+
+  function clearActiveDraft() {
+    setActiveDraft(null);
+    pushToast('Borrador desvinculado. Los materiales se mantienen en la pantalla.', 'info');
+  }
+
   function addLine(ofId: string, article: Article, quantity: number) {
     const code = String(article.code || '').trim().toUpperCase();
     if (!code) {
@@ -434,13 +588,14 @@ function App() {
   }
 
   function clearAll() {
-    const snapshot = { orderCode, ofs };
+    const snapshot = { orderCode, ofs, activeDraft };
     const hadContent =
       Boolean(orderCode.trim()) ||
       ofs.some((ofBlock) => ofBlock.of.trim() || ofBlock.materials.length > 0);
 
     setOrderCode('');
     setOfs([createOf()]);
+    setActiveDraft(null);
 
     if (hadContent) {
       pushToast('Formulario limpio.', 'info', {
@@ -448,6 +603,7 @@ function App() {
         run: () => {
           setOrderCode(snapshot.orderCode);
           setOfs(snapshot.ofs);
+          setActiveDraft(snapshot.activeDraft);
         }
       });
     }
@@ -498,9 +654,10 @@ function App() {
       const overwriteText = overwrittenCount > 0 ? ` (${overwrittenCount} sobrescritos)` : '';
       const archiveText = data.orderArchive ? ` Pedido archivado: ${data.orderArchive.filename}.` : '';
 
-      const snapshot = { orderCode, ofs };
+      const snapshot = { orderCode, ofs, activeDraft };
       setOrderCode('');
       setOfs([createOf()]);
+      setActiveDraft(null);
       setHistoryVersion((current) => current + 1);
 
       pushToast(
@@ -513,6 +670,7 @@ function App() {
           run: () => {
             setOrderCode(snapshot.orderCode);
             setOfs(snapshot.ofs);
+            setActiveDraft(snapshot.activeDraft);
           }
         }
       );
@@ -532,7 +690,11 @@ function App() {
         setThemeMode={setThemeMode}
       />
 
-      <Navigation activeTab={activeTab} onChangeTab={setActiveTab} />
+      <Navigation
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        draftsCount={draftsCount}
+      />
 
       {activeTab === 'assignments' && (
         <AssignmentWorkspace
@@ -542,7 +704,11 @@ function App() {
           totals={totals}
           duplicateOfs={duplicateOfs}
           isSavingToNetwork={isSavingToNetwork}
+          activeDraft={activeDraft}
           onSave={() => saveExcelToNetwork()}
+          onOpenSaveDraft={() => setIsSaveDraftOpen(true)}
+          onQuickSaveDraft={handleQuickSaveDraft}
+          onClearActiveDraft={clearActiveDraft}
           onAddOf={addOf}
           onOpenLoadModel={() => setActiveTab('models')}
           onOpenSaveAsModel={() => setIsSaveAsModelOpen(true)}
@@ -553,6 +719,19 @@ function App() {
           onAddLine={addLine}
           onRemoveLine={removeLine}
           onUpdateLineQuantity={updateLineQuantity}
+        />
+      )}
+
+      {activeTab === 'drafts' && (
+        <DraftsView
+          activeDraftId={activeDraft?.id || null}
+          currentOrderCode={orderCode}
+          hasActiveContent={Boolean(orderCode.trim()) || ofs.some((b) => b.of.trim() || b.materials.length > 0)}
+          onResumeDraft={(draft) => resumeDraft(draft)}
+          onSaveCurrentAsDraft={() => setIsSaveDraftOpen(true)}
+          onConvertToModel={handleDraftToModel}
+          pushToast={pushToast}
+          refreshTrigger={draftsVersion}
         />
       )}
 
@@ -575,11 +754,45 @@ function App() {
         </div>
       )}
 
+      {isSaveDraftOpen && (
+        <SaveDraftModal
+          initialDraft={activeDraft}
+          orderCode={orderCode}
+          ofs={ofs}
+          onClose={() => setIsSaveDraftOpen(false)}
+          onSave={handleSaveDraftModal}
+        />
+      )}
+
       {isSaveAsModelOpen && (
         <SaveAsModelModal
-          ofs={ofs}
-          onClose={() => setIsSaveAsModelOpen(false)}
+          ofs={modelModalOfs || ofs}
+          onClose={() => {
+            setIsSaveAsModelOpen(false);
+            setModelModalOfs(null);
+          }}
           onSave={handleSaveCurrentAsModel}
+        />
+      )}
+
+      {pendingDraftToResume && (
+        <ConfirmDialog
+          title="Reemplazar la asignación actual"
+          description={
+            <>
+              Tienes materiales en la pantalla de <strong>Asignaciones</strong>.
+              <br />
+              ¿Quieres descartar el trabajo actual y abrir el borrador <strong>"{pendingDraftToResume.name}"</strong>?
+            </>
+          }
+          items={[]}
+          confirmLabel="Cargar borrador"
+          onCancel={() => setPendingDraftToResume(null)}
+          onConfirm={() => {
+            const draft = pendingDraftToResume;
+            setPendingDraftToResume(null);
+            resumeDraft(draft, true);
+          }}
         />
       )}
 

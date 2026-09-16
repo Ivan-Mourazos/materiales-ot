@@ -61,6 +61,18 @@ export type PersistedState = {
   ofs: OfBlock[];
 };
 
+export type OrderDraft = {
+  id: string;
+  name: string;
+  orderCode: string;
+  notes?: string;
+  ofs: OfBlock[];
+  createdAt: string;
+  updatedAt: string;
+  totals: { ofs: number; lines: number; units: number };
+  sourceModelName?: string;
+};
+
 export type ToastType = 'ok' | 'error' | 'warn' | 'info';
 
 export type ToastAction = {

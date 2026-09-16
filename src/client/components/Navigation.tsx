@@ -1,13 +1,15 @@
-import { Boxes, FileSpreadsheet, History, Layers } from 'lucide-react';
+import { Boxes, FileClock, FileSpreadsheet, History, Layers } from 'lucide-react';
 
-export type ActiveTab = 'assignments' | 'models' | 'articles' | 'history';
+export type ActiveTab = 'assignments' | 'drafts' | 'models' | 'articles' | 'history';
 
 export function Navigation({
   activeTab,
-  onChangeTab
+  onChangeTab,
+  draftsCount
 }: {
   activeTab: ActiveTab;
   onChangeTab: (tab: ActiveTab) => void;
+  draftsCount?: number;
 }) {
   return (
     <nav className="app-tabs" aria-label="Vistas principales">
@@ -19,6 +21,18 @@ export function Navigation({
       >
         <FileSpreadsheet aria-hidden="true" />
         Asignaciones
+      </button>
+      <button
+        className={activeTab === 'drafts' ? 'active' : ''}
+        aria-current={activeTab === 'drafts' ? 'page' : undefined}
+        type="button"
+        onClick={() => onChangeTab('drafts')}
+      >
+        <FileClock aria-hidden="true" />
+        Borradores
+        {typeof draftsCount === 'number' && draftsCount > 0 && (
+          <span className="nav-badge">{draftsCount}</span>
+        )}
       </button>
       <button
         className={activeTab === 'models' ? 'active' : ''}

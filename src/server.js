@@ -9,6 +9,7 @@ import { checkDatabase, closeDatabase, getArticleStockDetails, listArticleFilter
 import { buildOfWorkbook, buildOrderArchiveWorkbook, buildReservationWorkbook } from './excel.js';
 import { appendHistory, listHistory } from './history.js';
 import { deleteModel, getModelById, listModels, saveModel } from './models.js';
+import { deleteDraft, getDraftById, listDrafts, saveDraft } from './drafts.js';
 import { normalizeReservation } from './validation.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -105,6 +106,55 @@ app.put('/api/models/:id', async (req, res, next) => {
 app.delete('/api/models/:id', async (req, res, next) => {
   try {
     await deleteModel(req.params.id);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/drafts', async (_req, res, next) => {
+  try {
+    const drafts = await listDrafts();
+    res.json({ drafts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/drafts/:id', async (req, res, next) => {
+  try {
+    const draft = await getDraftById(req.params.id);
+    if (!draft) {
+      res.status(404).json({ error: 'Borrador no encontrado.' });
+      return;
+    }
+    res.json({ draft });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/drafts', async (req, res, next) => {
+  try {
+    const saved = await saveDraft(req.body);
+    res.status(201).json({ ok: true, draft: saved });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/drafts/:id', async (req, res, next) => {
+  try {
+    const saved = await saveDraft({ ...req.body, id: req.params.id });
+    res.json({ ok: true, draft: saved });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/drafts/:id', async (req, res, next) => {
+  try {
+    await deleteDraft(req.params.id);
     res.json({ ok: true });
   } catch (error) {
     next(error);
