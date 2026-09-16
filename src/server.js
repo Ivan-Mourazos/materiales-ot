@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { checkDatabase, closeDatabase, getArticleStockDetails, listArticleFilters, listArticles, searchArticles } from './db.js';
 import { buildOfWorkbook, buildOrderArchiveWorkbook, buildReservationWorkbook } from './excel.js';
 import { appendHistory, listHistory } from './history.js';
+import { deleteModel, getModelById, listModels, saveModel } from './models.js';
 import { normalizeReservation } from './validation.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,6 +47,65 @@ app.get('/api/health', async (_req, res, next) => {
 app.get('/api/history', async (req, res, next) => {
   try {
     res.json({ entries: await listHistory(req.query.limit) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/models', async (_req, res, next) => {
+  try {
+    const models = await listModels();
+    res.json({ models });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/models/:id', async (req, res, next) => {
+  try {
+    const model = await getModelById(req.params.id);
+    if (!model) {
+      res.status(404).json({ error: 'Modelo no encontrado.' });
+      return;
+    }
+    res.json({ model });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/models', async (req, res, next) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    if (!name) {
+      res.status(400).json({ error: 'El nombre del modelo es obligatorio.' });
+      return;
+    }
+    const saved = await saveModel(req.body);
+    res.status(201).json({ ok: true, model: saved });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/models/:id', async (req, res, next) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    if (!name) {
+      res.status(400).json({ error: 'El nombre del modelo es obligatorio.' });
+      return;
+    }
+    const saved = await saveModel({ ...req.body, id: req.params.id });
+    res.json({ ok: true, model: saved });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/models/:id', async (req, res, next) => {
+  try {
+    await deleteModel(req.params.id);
+    res.json({ ok: true });
   } catch (error) {
     next(error);
   }
