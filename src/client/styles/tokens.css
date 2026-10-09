@@ -132,13 +132,10 @@
 
   /* ── Variables de la web → tokens de CoordinaOT ──
      Las reglas de siempre usan estos nombres: apuntan a CoordinaOT y cambian solas. */
-  --glow: transparent;
-  --surface-translucent: var(--glass-bg-strong);
   --surface-3: var(--border);
   --input-bg: var(--glass-chip);
   --stripe: var(--zone);
   --row-hover: var(--surface-2);
-  --scrollbar: var(--border-strong);
 
   /* CoordinaOT tiene dos tintas (text y text-muted): --ink-3 usa la segunda */
   --ink: var(--text);
@@ -151,7 +148,6 @@
   --accent-border: var(--control-active-border);
   /* El texto dorado de CoordinaOT: text-brand-800 (oscuro: brand-300) */
   --accent-ink: var(--color-brand-800);
-  --accent-glow: transparent;
 
   /* Verde, ámbar y rojo de CoordinaOT (--tramo-holgado, amber-700, red-700) */
   --ok-ink: #04785a;
