@@ -64,3 +64,50 @@ test('simultaneous draft saves preserve every draft', async (t) => {
   assert.equal(new Set(saved.map((draft) => draft.id)).size, 6);
   assert.ok(saved.every((draft) => ids.has(draft.id)));
 });
+
+test('las líneas sin cantidad se guardan como null y no suman unidades', async (t) => {
+  const { api } = await isolatedDrafts(t);
+  const saved = await api.saveDraft({
+    name: 'Con huecos',
+    ofs: [{ of: '1', description: 'P', materials: [{ code: 'a', quantity: '' }, { code: 'b', quantity: 3 }] }]
+  });
+  assert.deepEqual(saved.ofs[0].materials.map((m) => m.quantity), [null, 3]);
+  assert.equal(saved.totals.units, 3);
+  assert.equal(saved.totals.lines, 2);
+});
+
+test('la descripción de la parte de origen se conserva', async (t) => {
+  const { api } = await isolatedDrafts(t);
+  const saved = await api.saveDraft({
+    name: 'D',
+    ofs: [
+      { of: '', description: 'Faldón', partDescription: 'Rejilla y PVC', materials: [] },
+      { of: '', description: 'Sin origen', materials: [] }
+    ]
+  });
+  assert.equal(saved.ofs[0].partDescription, 'Rejilla y PVC');
+  assert.equal('partDescription' in saved.ofs[1], false);
+});
+
+test('una cantidad no válida rechaza el borrador con 400', async (t) => {
+  const { api } = await isolatedDrafts(t);
+  await assert.rejects(
+    api.saveDraft({ name: 'D', ofs: [{ of: '7', materials: [{ code: 'X', quantity: 'abc' }] }] }),
+    (error) => error.statusCode === 400 && error.message.includes('X de la OF 7')
+  );
+});
+
+test('conflictos en borradores: 409 con versión vieja, guarda sin versión', async (t) => {
+  const { api, file } = await isolatedDrafts(t);
+  const v0 = await api.saveDraft({ name: 'D', ofs: [] });
+  const v1 = await api.saveDraft({ id: v0.id, name: 'D1', ofs: [], expectedUpdatedAt: v0.updatedAt });
+  assert.ok(v1.updatedAt > v0.updatedAt);
+
+  const antes = await readFile(file, 'utf8');
+  await assert.rejects(
+    api.saveDraft({ id: v0.id, name: 'D2', ofs: [], expectedUpdatedAt: v0.updatedAt }),
+    (error) => error.statusCode === 409 && error.payload.current.name === 'D1'
+  );
+  assert.equal(await readFile(file, 'utf8'), antes);
+  assert.equal((await api.saveDraft({ id: v0.id, name: 'D3', ofs: [] })).name, 'D3');
+});

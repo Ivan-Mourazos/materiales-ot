@@ -135,3 +135,20 @@ sudo mount -t cifs "//192.168.0.128/Oftecnica" /mnt/oftecnica \
 Para producción conviene dejarlo en `/etc/fstab` o en una unidad `systemd` con reconexión automática. El usuario que ejecuta Node debe poder crear y sobrescribir archivos en esas carpetas.
 
 La app avisa en `/api/health` y bloquea el guardado si se configura una ruta UNC de Windows estando en Linux.
+
+---
+
+## Copias de seguridad de modelos y borradores
+
+Antes de cada guardado de `data/models.json` o `data/drafts.json`, la web copia la
+versión anterior a `data/backups/`, con la fecha en el nombre
+(`models-2026-10-09T08-53-12-123Z-000004.json`). Se conservan las 30 más recientes
+de cada archivo. `data/` no está en git: estas copias solo existen en el servidor.
+
+Para volver a una versión anterior:
+
+```bash
+pm2 stop materiales-ot
+cp data/backups/models-<fecha>.json data/models.json   # o drafts-<fecha>.json → data/drafts.json
+pm2 start materiales-ot
+```
