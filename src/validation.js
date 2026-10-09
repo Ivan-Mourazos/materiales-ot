@@ -1,19 +1,21 @@
+import { httpError } from './httpError.js';
+
 export function normalizeReservation(payload) {
   if (!payload || typeof payload !== 'object') {
-    throw new Error('La solicitud no tiene formato válido.');
+    throw validationError('La solicitud no tiene formato válido.');
   }
 
   const orderCode = cleanText(payload.orderCode || payload.pedido || '');
   const ofs = Array.isArray(payload.ofs) ? payload.ofs : [];
 
   if (ofs.length === 0) {
-    throw new Error('Añade al menos una OF.');
+    throw validationError('Añade al menos una OF.');
   }
 
   const normalizedOfs = ofs.map((ofBlock, index) => {
     const of = cleanText(ofBlock?.of);
     if (!of) {
-      throw new Error(`La OF ${index + 1} no tiene número.`);
+      throw validationError(`La OF ${index + 1} no tiene número.`);
     }
 
     const description = cleanText(ofBlock?.description).slice(0, 120);
@@ -23,12 +25,15 @@ export function normalizeReservation(payload) {
       .flatMap((line) => {
         const code = cleanText(line?.code || line?.codArticle || line?.articleCode).toUpperCase();
         const description = cleanText(line?.description);
-        const quantity = Number(line?.quantity);
+        const missing = isMissingQuantity(line?.quantity);
 
-        if (!code && !description && !quantity) return [];
-        if (!code) throw new Error(`Hay una línea sin artículo en la OF ${of}.`);
-        if (!Number.isFinite(quantity) || quantity <= 0) {
-          throw new Error(`La cantidad de ${code} en la OF ${of} debe ser mayor que cero.`);
+        if (!code && !description && missing) return [];
+        if (!code) throw validationError(`Hay una línea sin artículo en la OF ${of}.`);
+        if (missing) throw validationError(`Falta la cantidad de ${code} en la OF ${of}.`);
+
+        const quantity = Number(line.quantity);
+        if (!Number.isFinite(quantity) || quantity < 0) {
+          throw validationError(`La cantidad de ${code} en la OF ${of} no es válida.`);
         }
 
         return [{
@@ -39,13 +44,24 @@ export function normalizeReservation(payload) {
       });
 
     if (normalizedMaterials.length === 0) {
-      throw new Error(`La OF ${of} no tiene materiales.`);
+      throw validationError(`La OF ${of} no tiene materiales.`);
     }
 
     return { of, description, materials: normalizedMaterials };
   });
 
   return { orderCode, ofs: normalizedOfs };
+}
+
+// Vacío, null o 0 = la línea aún no tiene cantidad (los modelos y borradores lo permiten).
+function isMissingQuantity(value) {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string' && value.trim() === '') return true;
+  return Number(value) === 0;
+}
+
+function validationError(message) {
+  return httpError(400, message);
 }
 
 function cleanText(value) {

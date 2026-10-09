@@ -1,6 +1,7 @@
 import compression from 'compression';
 import express from 'express';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,12 +11,15 @@ import { buildOfWorkbook, buildOrderArchiveWorkbook, buildReservationWorkbook } 
 import { appendHistory, listHistory } from './history.js';
 import { deleteModel, getModelById, listModels, saveModel } from './models.js';
 import { deleteDraft, getDraftById, listDrafts, saveDraft } from './drafts.js';
+import { httpError } from './httpError.js';
 import { normalizeReservation } from './validation.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distDir = path.join(__dirname, '..', 'dist');
 const isProduction = process.env.NODE_ENV === 'production';
+// La versión sale en /api/health para saber qué hay desplegado sin entrar al servidor.
+const packageInfo = JSON.parse(readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 
 const app = express();
 
@@ -32,6 +36,7 @@ app.get('/api/health', async (_req, res, next) => {
 
     res.json({
       ok: true,
+      version: packageInfo.version,
       database,
       networkSave: exportPath.configured && exportPath.valid && exportPath.accessible !== false,
       orderArchive: orderArchivePath.configured && orderArchivePath.valid && orderArchivePath.accessible !== false,
@@ -365,7 +370,7 @@ await configureFrontend();
 
 app.use((error, _req, res, _next) => {
   const status = error.statusCode
-    || (error.message?.startsWith('La ') || error.message?.startsWith('Anade') || error.message?.startsWith('Hay ')
+    || (error.message?.startsWith('La ') || error.message?.startsWith('Añade') || error.message?.startsWith('Hay ')
       ? 400
       : 500);
 
@@ -374,7 +379,8 @@ app.use((error, _req, res, _next) => {
   }
 
   res.status(status).json({
-    error: status === 500 && !error.statusCode ? 'No se pudo completar la operación.' : error.message
+    error: status === 500 && !error.statusCode ? 'No se pudo completar la operación.' : error.message,
+    ...(error.payload || {})
   });
 });
 
@@ -440,12 +446,6 @@ function findDuplicatedFilenames(targets) {
   }
 
   return Array.from(duplicated);
-}
-
-function httpError(status, message) {
-  const error = new Error(message);
-  error.statusCode = status;
-  return error;
 }
 
 function buildPartialSaveMessage(failedFilename, saved) {
