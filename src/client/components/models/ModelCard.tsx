@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { ChevronDown, Copy, Edit2, Layers, Play, Trash2 } from 'lucide-react';
 import type { AssignmentModel } from '../../types';
 import { formatDisplayText, formatNumber, historyDateFormat } from '../../utils';
+import { countMissingQuantities, hasQuantity } from '../../quantities';
 
 export function ModelCard({
   model,
@@ -20,6 +21,7 @@ export function ModelCard({
   const [isOpen, setIsOpen] = useState(false);
 
   const totalLines = model.parts.reduce((sum, part) => sum + part.materials.length, 0);
+  const missingLines = countMissingQuantities(model.parts);
 
   return (
     <article className={`model-card ${isOpen ? 'open' : ''}`}>
@@ -48,6 +50,9 @@ export function ModelCard({
             <span className="history-chip">
               {totalLines} {totalLines === 1 ? 'artículo' : 'artículos'}
             </span>
+            {missingLines > 0 && (
+              <span className="history-chip missing-chip">{missingLines} sin cantidad</span>
+            )}
 
           </div>
         </button>
@@ -133,7 +138,11 @@ export function ModelCard({
                             <strong>{mat.code}</strong>
                           </td>
                           <td>{formatDisplayText(mat.description) || '-'}</td>
-                          <td>{formatNumber(mat.quantity)}</td>
+                          <td>
+                            {hasQuantity(mat.quantity)
+                              ? formatNumber(mat.quantity)
+                              : <span className="quantity-missing-text">sin cantidad</span>}
+                          </td>
                         </tr>
                       ))
                     )}

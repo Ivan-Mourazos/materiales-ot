@@ -29,7 +29,7 @@ export function AssignmentWorkspace({
   orderCode: string;
   setOrderCode: (value: string) => void;
   ofs: OfBlock[];
-  totals: { ofs: number; lines: number; units: number };
+  totals: { ofs: number; lines: number; units: number; missing: number };
   duplicateOfs: Set<string>;
   isSavingToNetwork: boolean;
   activeDraft?: { id: string; name: string } | null;

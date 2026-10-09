@@ -16,7 +16,7 @@ export function SummaryPanel({
 }: {
   orderCode: string;
   setOrderCode: (value: string) => void;
-  totals: { ofs: number; lines: number; units: number };
+  totals: { ofs: number; lines: number; units: number; missing: number };
   isSavingToNetwork: boolean;
   activeDraft?: { id: string; name: string } | null;
   onSave: () => void;
@@ -63,6 +63,13 @@ export function SummaryPanel({
         <Metric label="líneas" value={totals.lines} />
         <Metric label="uds." value={formatNumber(totals.units)} />
       </div>
+
+      {totals.missing > 0 && (
+        <p className="missing-hint" role="status">
+          <AlertTriangle aria-hidden="true" />
+          {totals.missing === 1 ? '1 línea sin cantidad' : `${totals.missing} líneas sin cantidad`}: complétalas antes de generar.
+        </p>
+      )}
 
       <div className="panel-buttons">
         <button

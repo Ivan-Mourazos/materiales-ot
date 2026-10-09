@@ -18,6 +18,7 @@ import type {
   ToastType
 } from './types';
 import { roundQuantity, uid } from './utils';
+import { addQuantities, countMissingQuantities, hasQuantity, scaleQuantity, sumQuantities } from './quantities';
 
 import { Header } from './components/Header';
 import { Navigation, type ActiveTab } from './components/Navigation';
@@ -191,7 +192,8 @@ function App() {
     return {
       ofs: ofs.length,
       lines: lines.length,
-      units: roundQuantity(lines.reduce((sum, line) => sum + line.quantity, 0))
+      units: sumQuantities(lines.map((line) => line.quantity)),
+      missing: countMissingQuantities(ofs)
     };
   }, [ofs]);
 
@@ -273,12 +275,13 @@ function App() {
     const newOfBlocks: OfBlock[] = partsToTransfer.map(({ part, multiplier }) => ({
       id: uid(),
       of: '',
-      description: part.name + (part.description ? ` (${part.description})` : ''),
+      description: part.name,
+      partDescription: part.description || '',
       materials: part.materials.map((m) => ({
         id: uid(),
         code: m.code,
         description: m.description,
-        quantity: roundQuantity(m.quantity * multiplier),
+        quantity: scaleQuantity(m.quantity, multiplier),
         width: m.width ?? null,
         widthWarning: m.widthWarning ?? null
       }))
@@ -334,7 +337,7 @@ function App() {
         id: m.id || uid(),
         code: m.code,
         description: m.description || '',
-        quantity: roundQuantity(m.quantity),
+        quantity: hasQuantity(m.quantity) ? roundQuantity(m.quantity) : null,
         width: m.width ?? null,
         widthWarning: m.widthWarning ?? null
       }))
@@ -464,7 +467,7 @@ function App() {
             ...ofBlock,
             materials: ofBlock.materials.map((line) =>
               line.code === code
-                ? { ...line, quantity: roundQuantity(line.quantity + quantity) }
+                ? { ...line, quantity: addQuantities(line.quantity, quantity) }
                 : line
             )
           };
@@ -544,7 +547,7 @@ function App() {
             ...ofBlock,
             materials: ofBlock.materials.map((line) =>
               line.code === code
-                ? { ...line, quantity: roundQuantity(line.quantity + quantity) }
+                ? { ...line, quantity: addQuantities(line.quantity, quantity) }
                 : line
             )
           };

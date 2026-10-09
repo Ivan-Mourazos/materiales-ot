@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { OrderDraft } from '../../types';
 import { formatDisplayText, formatNumber, historyDateFormat } from '../../utils';
+import { countMissingQuantities, hasQuantity, sumQuantities } from '../../quantities';
 
 export function DraftCard({
   draft,
@@ -33,11 +34,8 @@ export function DraftCard({
 
   const totalLines = draft.totals?.lines ?? draft.ofs.reduce((sum, of) => sum + of.materials.length, 0);
   const totalUnits =
-    draft.totals?.units ??
-    draft.ofs.reduce(
-      (sum, of) => sum + of.materials.reduce((mSum, m) => mSum + m.quantity, 0),
-      0
-    );
+    draft.totals?.units ?? sumQuantities(draft.ofs.flatMap((of) => of.materials.map((m) => m.quantity)));
+  const missingLines = countMissingQuantities(draft.ofs);
 
   return (
     <article
@@ -80,6 +78,9 @@ export function DraftCard({
               {totalLines} {totalLines === 1 ? 'línea' : 'líneas'}
             </span>
             <span className="history-chip">{formatNumber(totalUnits)} uds.</span>
+            {missingLines > 0 && (
+              <span className="history-chip missing-chip">{missingLines} sin cantidad</span>
+            )}
           </div>
         </button>
 
@@ -175,7 +176,11 @@ export function DraftCard({
                             <strong>{m.code}</strong>
                           </td>
                           <td>{formatDisplayText(m.description) || '-'}</td>
-                          <td style={{ textAlign: 'right' }}>{formatNumber(m.quantity)}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            {hasQuantity(m.quantity)
+                              ? formatNumber(m.quantity)
+                              : <span className="quantity-missing-text">sin cantidad</span>}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

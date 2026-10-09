@@ -5,6 +5,7 @@ import { Layers, PackagePlus, Plus, Save, Trash2, X } from 'lucide-react';
 import type { Article, AssignmentModel, ModelPart } from '../../types';
 import { formatDisplayText, roundQuantity, uid } from '../../utils';
 import { ArticlePicker, type ArticlePickerHandle } from '../common/ArticlePicker';
+import { addQuantities } from '../../quantities';
 
 export function ModelEditorModal({
   initialModel,
@@ -95,7 +96,7 @@ export function ModelEditorModal({
           const updated = [...part.materials];
           updated[existingIdx] = {
             ...updated[existingIdx],
-            quantity: roundQuantity(updated[existingIdx].quantity + quantity)
+            quantity: addQuantities(updated[existingIdx].quantity, quantity)
           };
           return { ...part, materials: updated };
         }

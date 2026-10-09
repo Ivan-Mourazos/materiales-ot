@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { MaterialLine, OfBlock } from '../../types';
 import { formatDisplayText } from '../../utils';
+import { hasQuantity, quantityInputValue } from '../../quantities';
 
 export function MaterialTable({
   ofBlock,
@@ -92,8 +93,10 @@ export function QuantityCell({
 
   return (
     <input
-      className="quantity-cell-input"
-      value={draft ?? String(line.quantity)}
+      className={`quantity-cell-input${hasQuantity(line.quantity) ? '' : ' quantity-missing'}`}
+      data-line-id={line.id}
+      value={draft ?? quantityInputValue(line.quantity)}
+      placeholder="Sin cantidad"
       onChange={(event) => setDraft(event.target.value)}
       onFocus={(event) => event.target.select()}
       onBlur={commit}

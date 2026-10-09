@@ -1,3 +1,5 @@
+import type { Quantity } from './quantities';
+
 export type Article = {
   idArticle: string;
   code: string;
@@ -44,7 +46,7 @@ export type MaterialLine = {
   id: string;
   code: string;
   description: string;
-  quantity: number;
+  quantity: Quantity;
   width?: number | null;
   widthWarning?: string | null;
 };
@@ -53,6 +55,8 @@ export type OfBlock = {
   id: string;
   of: string;
   description: string;
+  /** Descripción de la parte del modelo de origen, para guardarla de vuelta sin tocar el nombre. */
+  partDescription?: string;
   materials: MaterialLine[];
 };
 
@@ -125,7 +129,7 @@ export type ModelMaterial = {
   id: string;
   code: string;
   description: string;
-  quantity: number;
+  quantity: Quantity;
   width?: number | null;
   widthWarning?: string | null;
 };

@@ -1,0 +1,53 @@
+/* ============================================================
+   Cantidades pendientes: líneas guardadas sin cantidad
+   Selectores compuestos para no depender del orden de los @import.
+   ============================================================ */
+
+.quantity-cell-input.quantity-missing {
+  border-color: var(--warn-border);
+  background: var(--warn-soft);
+}
+
+.quantity-cell-input.quantity-missing::placeholder {
+  color: var(--warn-ink);
+  opacity: 0.85;
+}
+
+.quantity-missing-text {
+  color: var(--warn-ink);
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 550;
+}
+
+.history-chip.missing-chip {
+  border-color: var(--warn-border);
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+
+.material-pill.missing {
+  border-style: dashed;
+  border-color: var(--warn-border);
+  color: var(--warn-ink);
+}
+
+.missing-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-s);
+  padding: 8px 10px;
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.missing-hint svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+}

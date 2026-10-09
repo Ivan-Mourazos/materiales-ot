@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { BookmarkPlus, Save, X } from 'lucide-react';
 import type { AssignmentModel, OfBlock } from '../../types';
 import { formatNumber } from '../../utils';
+import { hasQuantity } from '../../quantities';
 
 export function SaveAsModelModal({
   ofs,
@@ -118,8 +119,8 @@ export function SaveAsModelModal({
                 </div>
                 <div className="save-as-materials-tags">
                   {part.materials.map((m) => (
-                    <span key={m.id} className="material-pill">
-                      {m.code} (x{formatNumber(m.quantity)})
+                    <span key={m.id} className={`material-pill${hasQuantity(m.quantity) ? '' : ' missing'}`}>
+                      {m.code} ({hasQuantity(m.quantity) ? `x${formatNumber(m.quantity)}` : 'sin cantidad'})
                     </span>
                   ))}
                   {part.materials.length === 0 && <span className="empty-pill">Sin materiales</span>}

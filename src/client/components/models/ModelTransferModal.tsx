@@ -2,7 +2,8 @@ import { ModelDialog } from '../common/ModelDialog';
 import { useMemo, useState } from 'react';
 import { ArrowRight, CheckSquare, Layers, Square, X } from 'lucide-react';
 import type { AssignmentModel, ModelPart } from '../../types';
-import { formatNumber, roundQuantity } from '../../utils';
+import { formatNumber } from '../../utils';
+import { countMissingQuantities, hasQuantity, scaleQuantity, sumQuantities } from '../../quantities';
 
 export function ModelTransferModal({
   model,
@@ -24,7 +25,8 @@ export function ModelTransferModal({
 
 
   const multiplier = Number(multiplierInput.replace(',', '.'));
-  const validMultiplier = Number.isFinite(multiplier) && multiplier > 0 && model.parts.every((p) => p.materials.every((m) => Number.isFinite(m.quantity * multiplier) && roundQuantity(m.quantity * multiplier) > 0));
+  // Las líneas sin cantidad siguen vacías al multiplicar: no deben impedir el volcado.
+  const validMultiplier = Number.isFinite(multiplier) && multiplier > 0;
 
   const togglePart = (id: string) => {
     setSelectedPartIds((prev) => {
@@ -52,10 +54,10 @@ export function ModelTransferModal({
   );
 
   const totalLinesSelected = selectedParts.reduce((sum, p) => sum + p.materials.length, 0);
-  const totalUnitsSelected = selectedParts.reduce(
-    (sum, p) => sum + p.materials.reduce((mSum, m) => mSum + roundQuantity(m.quantity * multiplier), 0),
-    0
+  const totalUnitsSelected = sumQuantities(
+    selectedParts.flatMap((p) => p.materials.map((m) => scaleQuantity(m.quantity, multiplier)))
   );
+  const missingSelected = countMissingQuantities(selectedParts);
 
   function handleConfirm() {
     if (selectedParts.length === 0 || !validMultiplier) return;
@@ -96,7 +98,7 @@ export function ModelTransferModal({
               aria-describedby="multiplier-hint"
               onChange={(e) => setMultiplierInput(e.target.value)}
             />
-            <span id="multiplier-hint" className={validMultiplier ? 'field-hint' : 'field-error'}>{validMultiplier ? 'Multiplica la cantidad base de cada material.' : 'Introduce una cantidad mayor que cero y válida para todos los materiales.'}</span>
+            <span id="multiplier-hint" className={validMultiplier ? 'field-hint' : 'field-error'}>{validMultiplier ? 'Multiplica la cantidad base de cada material. Las líneas sin cantidad siguen vacías.' : 'Introduce una cantidad mayor que cero.'}</span>
           </label>
 
           <div className="transfer-mode-selector">
@@ -153,11 +155,14 @@ export function ModelTransferModal({
                     {part.description && <em>{part.description}</em>}
                   </div>
                   <div className="transfer-part-materials-preview">
-                    {part.materials.map((m) => (
-                      <span key={m.id || m.code} className="material-pill">
-                        {m.code} (x{formatNumber(roundQuantity(m.quantity * multiplier))})
-                      </span>
-                    ))}
+                    {part.materials.map((m) => {
+                      const scaled = scaleQuantity(m.quantity, multiplier);
+                      return (
+                        <span key={m.id || m.code} className={`material-pill${hasQuantity(scaled) ? '' : ' missing'}`}>
+                          {m.code} ({hasQuantity(scaled) ? `x${formatNumber(scaled)}` : 'sin cantidad'})
+                        </span>
+                      );
+                    })}
                     {part.materials.length === 0 && <span className="empty-pill">Sin materiales</span>}
                   </div>
                 </div>
@@ -179,6 +184,12 @@ export function ModelTransferModal({
             <span>
               <strong>{formatNumber(totalUnitsSelected)}</strong> unidades totales
             </span>
+            {missingSelected > 0 && (
+              <>
+                <span>·</span>
+                <span className="quantity-missing-text">{missingSelected} sin cantidad</span>
+              </>
+            )}
           </div>
 
           <div className="modal-actions">

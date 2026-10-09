@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { FileClock, Loader2, Save, X } from 'lucide-react';
 import type { OfBlock } from '../../types';
 import { formatNumber } from '../../utils';
+import { sumQuantities } from '../../quantities';
 import { ModelDialog } from '../common/ModelDialog';
 
 export function SaveDraftModal({
@@ -35,10 +36,7 @@ export function SaveDraftModal({
   const nameRef = useRef<HTMLInputElement>(null);
 
   const totalLines = ofs.reduce((sum, b) => sum + b.materials.length, 0);
-  const totalUnits = ofs.reduce(
-    (sum, b) => sum + b.materials.reduce((mSum, m) => mSum + m.quantity, 0),
-    0
-  );
+  const totalUnits = sumQuantities(ofs.flatMap((b) => b.materials.map((m) => m.quantity)));
 
   async function handleConfirm() {
     if (!name.trim()) {
