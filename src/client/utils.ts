@@ -1,4 +1,5 @@
 import type { Article } from './types';
+export { roundQuantity } from './quantities';
 
 export function uid() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -75,10 +76,6 @@ export const historyDateFormat = new Intl.DateTimeFormat('es-ES', { dateStyle: '
 
 export function formatNumber(value: number) {
   return numberFormatter.format(value || 0);
-}
-
-export function roundQuantity(value: number) {
-  return Math.round(value * 1000000) / 1000000;
 }
 
 export function detectOrderYear(orderCode: string): number | null {
