@@ -127,3 +127,47 @@ test('cada guardado deja una instantánea de la versión anterior', async (t) =>
   const backups = await readdir(dataFile('backups'));
   assert.ok(backups.some((name) => name.startsWith('models-')));
 });
+
+test('la categoría se limpia, se recorta a 40 y se omite si está vacía', async (t) => {
+  const { api } = await isolatedLibrary(t);
+  const limpia = await api.saveModel({ name: 'A', category: '  Escenarios   móviles ', parts: [] });
+  assert.equal(limpia.category, 'Escenarios móviles');
+
+  const larga = await api.saveModel({ name: 'B', category: 'x'.repeat(60), parts: [] });
+  assert.equal(larga.category, 'x'.repeat(40));
+
+  for (const vacia of [undefined, null, '', '   ']) {
+    const saved = await api.saveModel({ name: 'C', category: vacia, parts: [] });
+    assert.ok(!('category' in saved));
+    assert.ok(!('category' in (await api.getModelById(saved.id))));
+  }
+});
+
+test('una categoría que no es texto da 400 y no guarda nada', async (t) => {
+  const { api } = await isolatedLibrary(t);
+  for (const mala of [42, ['Escenarios'], { nombre: 'Escenarios' }, true]) {
+    await assert.rejects(
+      api.saveModel({ name: 'D', category: mala, parts: [] }),
+      (error) => error.statusCode === 400 && error.message === 'Categoría no válida.'
+    );
+  }
+  assert.equal((await api.listModels()).length, 0);
+});
+
+test('al actualizar, sin el campo se conserva y con "" o null se quita', async (t) => {
+  const { api } = await isolatedLibrary(t);
+  let modelo = await api.saveModel({ name: 'E', category: 'Escenarios', parts: [] });
+
+  modelo = await api.saveModel({ id: modelo.id, name: 'E', parts: [], expectedUpdatedAt: modelo.updatedAt });
+  assert.equal(modelo.category, 'Escenarios');
+
+  modelo = await api.saveModel({ id: modelo.id, name: 'E', category: 'Toldos', parts: [], expectedUpdatedAt: modelo.updatedAt });
+  assert.equal(modelo.category, 'Toldos');
+
+  for (const quitar of ['', null]) {
+    modelo = await api.saveModel({ id: modelo.id, name: 'E', category: quitar, parts: [], expectedUpdatedAt: modelo.updatedAt });
+    assert.ok(!('category' in modelo));
+    assert.ok(!('category' in (await api.getModelById(modelo.id))));
+    modelo = await api.saveModel({ id: modelo.id, name: 'E', category: 'Toldos', parts: [], expectedUpdatedAt: modelo.updatedAt });
+  }
+});

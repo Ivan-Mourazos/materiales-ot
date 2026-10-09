@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { httpError } from './httpError.js';
 import { assertExpectedVersion, nextVersion, readJsonArray, writeJsonArray } from './jsonStore.js';
 import { normalizeStoredQuantity } from './quantity.js';
 
@@ -13,6 +14,23 @@ let writeQueue = Promise.resolve();
 // La biblioteca arranca vacía. Los modelos reales se crean desde la interfaz
 // o se cargan por la API (POST /api/models).
 const initialSeedModels = [];
+
+const MAX_CATEGORY_LENGTH = 40;
+
+/** '' = sin categoría. Limpia y recorta; solo rechaza lo que no es texto. */
+function sanitizeCategory(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value !== 'string') throw httpError(400, 'Categoría no válida.');
+  const clean = value.trim().replace(/\s+/g, ' ');
+  // Por caracteres, no por unidades UTF-16: no partir un emoji por la mitad
+  return Array.from(clean).slice(0, MAX_CATEGORY_LENGTH).join('').trim();
+}
+
+/** Pone o quita `category` sin dejar nunca '' en el JSON. */
+function withCategory(model, category) {
+  const { category: _previous, ...rest } = model;
+  return category ? { ...rest, category } : rest;
+}
 
 export async function listModels() {
   const models = await readJsonArray(modelsFile, initialSeedModels);
@@ -38,24 +56,26 @@ export function saveModel(modelData) {
         const current = models[existingIndex];
         // Dentro de la cola: dos peticiones simultáneas no pueden pasar las dos la comprobación
         assertExpectedVersion(current, modelData.expectedUpdatedAt, 'modelo');
-        resultModel = {
+        // Sin el campo en la petición se conserva; con '' o null se quita
+        const category = 'category' in modelData ? sanitizeCategory(modelData.category) : current.category || '';
+        resultModel = withCategory({
           ...current,
           name: String(modelData.name || '').trim() || current.name,
           description: String(modelData.description ?? current.description ?? '').trim(),
           parts,
           updatedAt: nextVersion(current.updatedAt || current.createdAt)
-        };
+        }, category);
         models[existingIndex] = resultModel;
       } else {
         const now = new Date().toISOString();
-        resultModel = {
+        resultModel = withCategory({
           id: modelData.id || randomUUID(),
           name: String(modelData.name || '').trim() || 'Nuevo Modelo',
           description: String(modelData.description || '').trim(),
           createdAt: now,
           updatedAt: now,
           parts
-        };
+        }, sanitizeCategory(modelData.category));
         models.unshift(resultModel);
       }
 
