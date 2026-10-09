@@ -830,3 +830,8 @@ button, a, input, select { touch-action: manipulation; }
 .save-mode-option.disabled em {
   color: var(--warn-ink);
 }
+
+/* Dentro de la rejilla de campos (diálogo de borradores) ocupa la fila entera */
+.model-editor-fields > .save-mode-options {
+  grid-column: 1 / -1;
+}
