@@ -77,16 +77,17 @@ export function QuantityCell({
   const [draft, setDraft] = useState<string | null>(null);
   const cancelledRef = useRef(false);
   function commit(input: HTMLInputElement) {
+    // "-" o "1e" llegan como valor vacío pero con badInput: no son "sin cantidad", son
+    // texto a medio teclear. Se lee al confirmar porque React no avisa si el valor sigue vacío.
+    const halfTyped = input.validity.badInput;
+    // Volver a pintar la cantidad: React cree que el campo ya muestra eso y no lo repintaría
+    if (halfTyped) input.value = quantityInputValue(line.quantity);
     if (cancelledRef.current) {
       cancelledRef.current = false;
       setDraft(null);
       return;
     }
-    // "-" o "1e" llegan como valor vacío pero con badInput: no son "sin cantidad", son
-    // texto a medio teclear. Se lee al confirmar porque React no avisa si el valor sigue vacío.
-    if (input.validity.badInput) {
-      // Volver a pintar la cantidad: React cree que el campo ya muestra eso y no lo repintaría
-      input.value = quantityInputValue(line.quantity);
+    if (halfTyped) {
       setDraft(null);
       return;
     }
