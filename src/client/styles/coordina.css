@@ -211,3 +211,51 @@
 .history-card.open {
   box-shadow: var(--panel-shadow);
 }
+
+/* ── Diálogo: `glass-panel-strong … rounded-2xl` (ConfirmDialog.tsx 107-122) ── */
+.modal {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+  box-shadow: var(--dialog-shadow);
+}
+
+/* El pie fijo del editor de modelos tapa el contenido al desplazarse: opaco, del color del panel */
+.model-dialog .modal-footer {
+  background: var(--glass-bg-pop);
+}
+
+/* ── Lo que flota (listas de resultados, menús, avisos): `ventana-3d` (globals.css 840-860) ── */
+.results,
+.apple-select-menu,
+.toast {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--glass-highlight) 60%, transparent), transparent 40%),
+    var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--pop-shadow);
+}
+
+/* ── Pastillas y contadores: `glass-chip`, la elegida `glass-chip-activo` ── */
+.category-pill,
+.library-count {
+  background: var(--chip-bg);
+  border-color: var(--control-border);
+  border-radius: var(--radius-s);
+  box-shadow: var(--chip-shadow);
+}
+
+.category-pill:hover {
+  box-shadow: var(--chip-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.category-pill.active,
+.category-pill.active:hover {
+  background: var(--active-bg);
+  border-color: var(--control-active-border);
+  box-shadow: var(--active-shadow);
+  color: var(--accent-ink);
+  transform: translateY(1px);
+}
