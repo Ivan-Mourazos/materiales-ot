@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -67,6 +67,27 @@ test('si no se puede hacer la instantánea, el guardado se completa igual', asyn
   await writeJsonArray(file, [{ v: 2 }]);
 
   assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), [{ v: 2 }]);
+  assert.equal(aviso.mock.callCount(), 1);
+});
+
+test('escrituras simultáneas al mismo archivo no chocan', async (t) => {
+  const directory = await carpetaTemporal(t);
+  const file = path.join(directory, 'models.json');
+  await assert.doesNotReject(Promise.all(Array.from({ length: 20 }, (_, v) => writeJsonArray(file, [{ v }]))));
+
+  const [final] = JSON.parse(await readFile(file, 'utf8'));
+  assert.equal(final.v >= 0 && final.v <= 19, true);
+});
+
+test('si la escritura falla no queda ningún .tmp', async (t) => {
+  const directory = await carpetaTemporal(t);
+  const file = path.join(directory, 'models.json');
+  // Una carpeta en la ruta de destino hace fallar el rename en Windows (y en POSIX).
+  await mkdir(file);
+  const aviso = t.mock.method(console, 'error', () => {});
+
+  await assert.rejects(writeJsonArray(file, [{ v: 1 }]));
+  assert.equal((await readdir(directory)).some((name) => name.includes('.tmp-')), false);
   assert.equal(aviso.mock.callCount(), 1);
 });
 

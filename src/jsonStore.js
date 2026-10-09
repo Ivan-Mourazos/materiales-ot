@@ -4,6 +4,8 @@ import { httpError } from './httpError.js';
 
 // Desempata instantáneas creadas en el mismo milisegundo.
 let snapshotSequence = 0;
+// Hace único el nombre del temporal aunque dos escrituras coincidan en el mismo milisegundo.
+let tmpSequence = 0;
 
 /**
  * Lee un archivo JSON que contiene un array.
@@ -29,12 +31,33 @@ export async function readJsonArray(file, seed = []) {
  * Si la copia o la poda fallan se registra y el guardado sigue: perder el
  * trabajo del usuario por no poder hacer una copia sería peor.
  */
-export async function writeJsonArray(file, data, { keep = 30 } = {}) {
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await snapshot(file, keep);
-  const tmpPath = `${file}.tmp-${process.pid}-${Date.now()}`;
-  await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-  await fs.rename(tmpPath, file);
+export function writeJsonArray(file, data, { keep = 30 } = {}) {
+  return inOrder(file, async () => {
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await snapshot(file, keep);
+    const tmpPath = `${file}.tmp-${process.pid}-${Date.now()}-${tmpSequence++}`;
+    try {
+      await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+      await fs.rename(tmpPath, file);
+    } catch (error) {
+      await fs.rm(tmpPath, { force: true }).catch(() => {});
+      throw error;
+    }
+  });
+}
+
+// Cola por archivo: en Windows, renombrar varios temporales sobre el mismo destino
+// a la vez puede fallar con EPERM. Las escrituras al mismo archivo se hacen en orden.
+const queues = new Map();
+
+function inOrder(file, task) {
+  const run = (queues.get(file) ?? Promise.resolve()).then(task);
+  const tail = run.catch(() => {});
+  queues.set(file, tail);
+  tail.then(() => {
+    if (queues.get(file) === tail) queues.delete(file);
+  });
+  return run;
 }
 
 /** Fecha ISO estrictamente posterior a `previous`, aunque el reloj no haya avanzado. */
