@@ -22,6 +22,7 @@ Además, "Guardar como modelo" **siempre crea uno nuevo**: al usar un modelo, el
 | Distintivo visual | Sencillo: marca amarilla en la línea y chapa "N sin cantidad" en tarjetas. |
 | Alta de artículos sin cantidad | Por todas las vías: modelo, borrador, pestaña Artículos y buscador de la OF. |
 | Actualizar en vez de duplicar | Modelos igual que borradores: "Actualizar" por defecto, "Guardar como nuevo" opcional. |
+| Dos personas actualizando lo mismo | Detección de conflictos: el segundo en guardar recibe aviso y elige sobrescribir o guardar como nuevo. |
 
 ## 1. Guardar sin cantidad
 
@@ -73,6 +74,32 @@ Hoy `handleTransferModelToAssignment` recibe partes y multiplicador, pero no el 
 
 **Borradores:** ya funcionan así (`activeDraft` + `saveAsNew` en `SaveDraftModal`). Solo se verifica.
 
+## 5. Detección de conflictos
+
+Al actualizar en el sitio aparece un riesgo que con las copias no existía: si dos personas tienen abierto el mismo modelo o borrador y guardan las dos, el segundo `PUT` borra sin aviso lo del primero.
+
+**Protocolo.** Todo `PUT` de modelo o borrador envía `expectedUpdatedAt`: el `updatedAt` de la versión que se cargó. Dentro de la cola de escritura, `saveModel`/`saveDraft` lo comparan con el guardado:
+
+- coinciden → se guarda como hoy y se devuelve el registro con su `updatedAt` nuevo
+- no coinciden → error con `statusCode = 409` y mensaje "Lo ha modificado otra persona el {fecha}." El manejador de errores de [server.js:366](../../../src/server.js#L366) ya respeta `statusCode`; además devuelve el registro actual para que la web pueda mostrar la fecha
+- no se envía → se guarda sin comprobar (compatibilidad con llamadas a la API hechas a mano)
+
+La comparación va **dentro** de la cola de escritura, no antes: así dos peticiones simultáneas no pueden pasar las dos la comprobación.
+
+**Cliente.** `activeModel` y `activeDraft` guardan también `updatedAt`, y lo renuevan con la respuesta de cada guardado correcto (si no, el segundo guardado de la misma persona chocaría consigo mismo). Las cinco llamadas que actualizan lo envían:
+
+| Dónde | Qué actualiza |
+|---|---|
+| [App.tsx:370](../../../src/client/App.tsx#L370) | el borrador activo |
+| [App.tsx:401](../../../src/client/App.tsx#L401) | borrador desde `SaveDraftModal` |
+| [DraftsView.tsx:128](../../../src/client/components/drafts/DraftsView.tsx#L128) | borrador desde su editor |
+| [ModelsView.tsx:72](../../../src/client/components/models/ModelsView.tsx#L72) | modelo desde su editor |
+| `SaveAsModelModal` (nuevo) | el modelo de origen |
+
+**Aviso.** Ante un 409, un diálogo: "Este modelo lo ha modificado otra persona el {fecha}, después de que lo abrieras." con tres salidas: **Sobrescribir** (repite el `PUT` sin `expectedUpdatedAt`), **Guardar como nuevo** (`POST` con el nombre + " (copia)") y **Cancelar** (no se guarda nada y lo editado sigue en pantalla). `ConfirmDialog` admite hoy dos botones; se le añade una acción secundaria opcional.
+
+No hay usuarios en la app, así que el aviso dice **cuándo** cambió, no **quién**.
+
 ## Datos existentes
 
 - La línea `VESHFNEGR50MM = 0.000001` del modelo "Escenario Orquesta ODL 720 EE" pasa a `null`. Es la única por debajo de 0,00001 entre modelos y borradores (comprobado en producción el 2026-10-09).
@@ -84,6 +111,7 @@ Hoy `handleTransferModelToAssignment` recibe partes y multiplicador, pero no el 
 - Saneado: vacío/`null`/`0` → `null`; `2.5` → `2.5`; negativo, `NaN` y texto → error.
 - `models.js` y `drafts.js` guardan y devuelven `null` sin convertirlo.
 - `validation.js` rechaza `null` y vacío con el mensaje nuevo; acepta cantidades válidas.
+- Conflictos, en modelos y en borradores: `expectedUpdatedAt` igual → guarda; distinto → 409 y el archivo queda intacto; ausente → guarda. Dos `PUT` simultáneos con la misma fecha: uno guarda y el otro recibe 409.
 
 **Funcionales (servidor local, carpetas temporales, capturas por CDP):**
 - Guardar un modelo y un borrador con una línea vacía; recargar; la línea sigue ahí, vacía.
@@ -92,8 +120,11 @@ Hoy `handleTransferModelToAssignment` recibe partes y multiplicador, pero no el 
 - Generar con una línea vacía: aviso con la lista, **ningún archivo** en la carpeta temporal.
 - Rellenar la cantidad y generar: sale el `.xls`.
 - Usar modelo completo ×1 → "Actualizar" activo y el `PUT` no crea copia. Usar ×3 o parcial → desactivado con su motivo.
+- Dos pestañas con el mismo modelo: guardar en una, luego en la otra → aparece el aviso; probar las tres salidas.
+- Guardar dos veces seguidas desde la misma pestaña → no salta el aviso.
 
 ## Fuera de alcance
 
 - **Categorías por familia de producto en Modelos** (p. ej. "Escenarios"): spec propio, a continuación.
 - Avisar de cantidades sospechosamente bajas. Con `null` disponible, el `0,000001` deja de ser necesario.
+- Instantáneas automáticas de `data/` y lista de faltantes clicable: propuestas en la auditoría, descartadas por ahora.
