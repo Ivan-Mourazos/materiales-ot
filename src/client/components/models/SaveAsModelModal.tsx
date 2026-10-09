@@ -1,25 +1,32 @@
 import { ModelDialog } from '../common/ModelDialog';
 import { useMemo, useRef, useState } from 'react';
 import { BookmarkPlus, Save, X } from 'lucide-react';
-import type { AssignmentModel, OfBlock } from '../../types';
+import type { ActiveModel, AssignmentModel, OfBlock } from '../../types';
 import { formatNumber } from '../../utils';
 import { hasQuantity } from '../../quantities';
 
+type SaveMode = 'update' | 'new';
+
 export function SaveAsModelModal({
   ofs,
+  sourceModel = null,
   onClose,
   onSave
 }: {
   ofs: OfBlock[];
+  sourceModel?: ActiveModel | null;
   onClose: () => void;
-  onSave: (modelData: Partial<AssignmentModel>) => Promise<void>;
+  onSave: (modelData: Partial<AssignmentModel>, mode: SaveMode) => Promise<void>;
 }) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const canUpdate = Boolean(sourceModel?.updatable);
+  const initialName = canUpdate ? sourceModel?.name ?? '' : '';
+  const initialDescription = canUpdate ? sourceModel?.description ?? '' : '';
+  const [mode, setMode] = useState<SaveMode>(canUpdate ? 'update' : 'new');
+  const [name, setName] = useState(initialName);
+  const [description, setDescription] = useState(initialDescription);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const nameRef = useRef<HTMLInputElement>(null);
-
 
   // Convert current OF blocks to Model Parts
   const partsToSave = useMemo(() => ofs
@@ -27,7 +34,10 @@ export function SaveAsModelModal({
     .map((ofBlock, index) => ({
       id: ofBlock.id,
       name: ofBlock.description.trim() || (ofBlock.of.trim() ? `OF ${ofBlock.of.trim()}` : `Parte ${index + 1}`),
-      description: ofBlock.of.trim() ? `Originado de OF ${ofBlock.of.trim()}` : '',
+      // La descripción de la parte de origen manda: así el nombre no crece en cada ida y vuelta
+      description: ofBlock.partDescription !== undefined
+        ? ofBlock.partDescription
+        : ofBlock.of.trim() ? `Originado de OF ${ofBlock.of.trim()}` : '',
       materials: ofBlock.materials.map((m) => ({
         id: m.id,
         code: m.code,
@@ -38,9 +48,18 @@ export function SaveAsModelModal({
       }))
     })), [ofs]);
 
+  function chooseMode(next: SaveMode) {
+    setMode(next);
+    if (!sourceModel) return;
+    const copyName = `${sourceModel.name} (copia)`;
+    if (next === 'new' && name === sourceModel.name) setName(copyName);
+    if (next === 'update' && name === copyName) setName(sourceModel.name);
+  }
+
   function requestClose() {
     if (isSaving) return;
-    if ((name.trim() || description.trim()) && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return;
+    const dirty = name !== initialName || description !== initialDescription;
+    if (dirty && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return;
     onClose();
   }
 
@@ -53,11 +72,7 @@ export function SaveAsModelModal({
     setError('');
     setIsSaving(true);
     try {
-      await onSave({
-        name: name.trim(),
-        description: description.trim(),
-        parts: partsToSave
-      });
+      await onSave({ name: name.trim(), description: description.trim(), parts: partsToSave }, mode);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar el modelo.');
@@ -66,6 +81,8 @@ export function SaveAsModelModal({
     }
   }
 
+  const isUpdate = mode === 'update';
+
   return (
     <ModelDialog className="save-as-model-modal" labelledBy="save-model-title" onClose={requestClose} busy={isSaving}>
         <div className="modal-header">
@@ -73,9 +90,11 @@ export function SaveAsModelModal({
             <BookmarkPlus aria-hidden="true" />
           </div>
           <div>
-            <h2 id="save-model-title">Guardar como modelo</h2>
+            <h2 id="save-model-title">{isUpdate ? 'Actualizar modelo' : 'Guardar como modelo'}</h2>
             <p className="modal-subtitle">
-              Reutiliza estas partes y materiales en futuras asignaciones.
+              {isUpdate
+                ? 'Guarda las partes y materiales actuales en el modelo que cargaste.'
+                : 'Reutiliza estas partes y materiales en futuras asignaciones.'}
             </p>
           </div>
           <button className="icon-button" type="button" onClick={requestClose} disabled={isSaving} title="Cerrar" aria-label="Cerrar">
@@ -85,9 +104,35 @@ export function SaveAsModelModal({
 
         {error && <div className="modal-error-banner" role="alert">{error}</div>}
 
+        {sourceModel && (
+          <fieldset className="save-mode-options">
+            <legend className="sr-only">Cómo guardar</legend>
+            <label className={`save-mode-option${canUpdate ? '' : ' disabled'}`}>
+              <input
+                type="radio"
+                name="modelSaveMode"
+                checked={isUpdate}
+                disabled={!canUpdate}
+                onChange={() => chooseMode('update')}
+              />
+              <span>
+                <strong>Actualizar “{sourceModel.name}”</strong>
+                <em>{sourceModel.reason ?? 'Guarda los cambios en el modelo que cargaste.'}</em>
+              </span>
+            </label>
+            <label className="save-mode-option">
+              <input type="radio" name="modelSaveMode" checked={!isUpdate} onChange={() => chooseMode('new')} />
+              <span>
+                <strong>Guardar como modelo nuevo</strong>
+                <em>El modelo original no cambia.</em>
+              </span>
+            </label>
+          </fieldset>
+        )}
+
         <div className="model-editor-fields">
           <label className="field">
-            <span>Nombre del nuevo modelo *</span>
+            <span>{isUpdate ? 'Nombre del modelo *' : 'Nombre del nuevo modelo *'}</span>
             <input
               ref={nameRef}
               required
@@ -142,7 +187,7 @@ export function SaveAsModelModal({
               disabled={isSaving || partsToSave.length === 0}
             >
               <Save aria-hidden="true" />
-              {isSaving ? 'Guardando…' : 'Guardar modelo'}
+              {isSaving ? 'Guardando…' : isUpdate ? 'Actualizar modelo' : 'Guardar modelo'}
             </button>
           </div>
         </div>

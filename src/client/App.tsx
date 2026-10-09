@@ -4,6 +4,7 @@ import '@fontsource-variable/inter';
 import './styles.css';
 
 import type {
+  ActiveModel,
   Article,
   AssignmentModel,
   ConnectionState,
@@ -18,6 +19,7 @@ import type {
   ToastType
 } from './types';
 import { roundQuantity, uid } from './utils';
+import { describeActiveModel } from './activeModel';
 import {
   addQuantities,
   countMissingQuantities,
@@ -141,6 +143,7 @@ function App() {
 
   // Borradores de pedidos
   const [activeDraft, setActiveDraft] = useState<{ id: string; name: string; notes?: string; orderCode?: string } | null>(null);
+  const [activeModel, setActiveModel] = useState<ActiveModel | null>(null);
   const [isSaveDraftOpen, setIsSaveDraftOpen] = useState(false);
   const [draftsVersion, setDraftsVersion] = useState(0);
   const [draftsCount, setDraftsCount] = useState(0);
@@ -280,10 +283,13 @@ function App() {
   }
 
   function handleTransferModelToAssignment(
+    model: AssignmentModel,
     partsToTransfer: { part: ModelPart; multiplier: number }[],
     replaceExisting: boolean
   ) {
     const previousOfs = ofs;
+    const previousActiveModel = activeModel;
+    const hadOtherContent = ofs.some((b) => b.of.trim() || b.description.trim() || b.materials.length > 0);
     const newOfBlocks: OfBlock[] = partsToTransfer.map(({ part, multiplier }) => ({
       id: uid(),
       of: '',
@@ -305,28 +311,65 @@ function App() {
       const rest = current.filter((b) => b.of.trim() || b.description.trim() || b.materials.length > 0);
       return [...rest, ...newOfBlocks];
     });
+    setActiveModel(
+      describeActiveModel(model, {
+        multiplier: partsToTransfer[0]?.multiplier ?? 1,
+        partsLoaded: partsToTransfer.length,
+        appendedToOtherOfs: !replaceExisting && hadOtherContent
+      })
+    );
 
     setActiveTab('assignments');
     pushToast(
       `${partsToTransfer.length} ${partsToTransfer.length === 1 ? 'parte cargada' : 'partes cargadas'}. Completa los números de OF y el pedido.`,
       'ok',
-      replaceExisting ? { label: 'Deshacer', run: () => setOfs(previousOfs) } : undefined
+      replaceExisting
+        ? {
+            label: 'Deshacer',
+            run: () => {
+              setOfs(previousOfs);
+              setActiveModel(previousActiveModel);
+            }
+          }
+        : undefined
     );
   }
 
-  async function handleSaveCurrentAsModel(modelData: Partial<AssignmentModel>) {
+  async function handleSaveCurrentAsModel(modelData: Partial<AssignmentModel>, mode: 'update' | 'new') {
+    // Desde un borrador (botón de su tarjeta) no hay modelo de origen que actualizar
+    const fromForm = modelModalOfs === null;
+
+    if (mode === 'update' && fromForm && activeModel?.updatable) {
+      const response = await fetch(`/api/models/${activeModel.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(modelData)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudo actualizar el modelo.');
+      setActiveModel({
+        ...activeModel,
+        name: data.model.name,
+        description: data.model.description || '',
+        updatedAt: data.model.updatedAt
+      });
+      pushToast(`Modelo "${data.model.name}" actualizado.`, 'ok');
+      return;
+    }
+
     const response = await fetch('/api/models', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(modelData)
     });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'No se pudo guardar el modelo en el servidor.');
 
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.error || 'No se pudo guardar el modelo en el servidor.');
+    // A partir de ahora, guardar desde el formulario actualiza este modelo nuevo
+    if (fromForm) {
+      setActiveModel(describeActiveModel(data.model, { multiplier: 1, partsLoaded: data.model.parts.length, appendedToOtherOfs: false }));
     }
-
-    pushToast(`Modelo "${modelData.name}" guardado con éxito en la biblioteca.`, 'ok');
+    pushToast(`Modelo "${data.model.name}" guardado en la biblioteca.`, 'ok');
   }
 
   function resumeDraft(draft: OrderDraft, force = false) {
@@ -340,7 +383,7 @@ function App() {
       return;
     }
 
-    const previousSnapshot = { orderCode, ofs, activeDraft };
+    const previousSnapshot = { orderCode, ofs, activeDraft, activeModel };
     const restoredOfs: OfBlock[] = draft.ofs.map((block) => ({
       id: block.id || uid(),
       of: block.of || '',
@@ -364,6 +407,7 @@ function App() {
       notes: draft.notes,
       orderCode: draft.orderCode
     });
+    setActiveModel(null);
     setActiveTab('assignments');
     pushToast(`Borrador "${draft.name}" cargado. Puedes continuar editando el pedido.`, 'ok', {
       label: 'Deshacer',
@@ -371,6 +415,7 @@ function App() {
         setOrderCode(previousSnapshot.orderCode);
         setOfs(previousSnapshot.ofs);
         setActiveDraft(previousSnapshot.activeDraft);
+        setActiveModel(previousSnapshot.activeModel);
       }
     });
   }
@@ -607,7 +652,7 @@ function App() {
   }
 
   function clearAll() {
-    const snapshot = { orderCode, ofs, activeDraft };
+    const snapshot = { orderCode, ofs, activeDraft, activeModel };
     const hadContent =
       Boolean(orderCode.trim()) ||
       ofs.some((ofBlock) => ofBlock.of.trim() || ofBlock.materials.length > 0);
@@ -615,6 +660,7 @@ function App() {
     setOrderCode('');
     setOfs([createOf()]);
     setActiveDraft(null);
+    setActiveModel(null);
 
     if (hadContent) {
       pushToast('Formulario limpio.', 'info', {
@@ -623,6 +669,7 @@ function App() {
           setOrderCode(snapshot.orderCode);
           setOfs(snapshot.ofs);
           setActiveDraft(snapshot.activeDraft);
+          setActiveModel(snapshot.activeModel);
         }
       });
     }
@@ -690,10 +737,11 @@ function App() {
       const overwriteText = overwrittenCount > 0 ? ` (${overwrittenCount} sobrescritos)` : '';
       const archiveText = data.orderArchive ? ` Pedido archivado: ${data.orderArchive.filename}.` : '';
 
-      const snapshot = { orderCode, ofs, activeDraft };
+      const snapshot = { orderCode, ofs, activeDraft, activeModel };
       setOrderCode('');
       setOfs([createOf()]);
       setActiveDraft(null);
+      setActiveModel(null);
       setHistoryVersion((current) => current + 1);
 
       pushToast(
@@ -707,6 +755,7 @@ function App() {
             setOrderCode(snapshot.orderCode);
             setOfs(snapshot.ofs);
             setActiveDraft(snapshot.activeDraft);
+            setActiveModel(snapshot.activeModel);
           }
         }
       );
@@ -802,6 +851,7 @@ function App() {
       {isSaveAsModelOpen && (
         <SaveAsModelModal
           ofs={modelModalOfs || ofs}
+          sourceModel={modelModalOfs ? null : activeModel}
           onClose={() => {
             setIsSaveAsModelOpen(false);
             setModelModalOfs(null);

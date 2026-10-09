@@ -103,26 +103,23 @@ export function SaveDraftModal({
 
       <div className="model-editor-fields">
         {isEditingExisting && (
-          <div style={{ marginBottom: 6, display: 'flex', gap: 14 }}>
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-              <input
-                type="radio"
-                name="draftMode"
-                checked={!saveAsNew}
-                onChange={() => setSaveAsNew(false)}
-              />
-              Sobrescribir borrador actual
+          <fieldset className="save-mode-options">
+            <legend className="sr-only">Cómo guardar</legend>
+            <label className="save-mode-option">
+              <input type="radio" name="draftMode" checked={!saveAsNew} onChange={() => setSaveAsNew(false)} />
+              <span>
+                <strong>Actualizar este borrador</strong>
+                <em>Guarda los cambios encima del borrador que abriste.</em>
+              </span>
             </label>
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-              <input
-                type="radio"
-                name="draftMode"
-                checked={saveAsNew}
-                onChange={() => setSaveAsNew(true)}
-              />
-              Guardar como nueva copia
+            <label className="save-mode-option">
+              <input type="radio" name="draftMode" checked={saveAsNew} onChange={() => setSaveAsNew(true)} />
+              <span>
+                <strong>Guardar como copia nueva</strong>
+                <em>El borrador original no cambia.</em>
+              </span>
             </label>
-          </div>
+          </fieldset>
         )}
 
         <label className="field">

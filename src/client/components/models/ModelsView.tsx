@@ -11,6 +11,7 @@ export function ModelsView({
   pushToast
 }: {
   onTransferModelToAssignment: (
+    model: AssignmentModel,
     partsToTransfer: { part: ModelPart; multiplier: number }[],
     replaceExisting: boolean
   ) => void;
@@ -233,8 +234,9 @@ export function ModelsView({
           model={modelToTransfer}
           onClose={() => setModelToTransfer(null)}
           onTransfer={(parts, replaceExisting) => {
+            const model = modelToTransfer;
             setModelToTransfer(null);
-            onTransferModelToAssignment(parts, replaceExisting);
+            onTransferModelToAssignment(model, parts, replaceExisting);
           }}
         />
       )}

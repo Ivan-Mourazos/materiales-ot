@@ -149,3 +149,13 @@ export type AssignmentModel = {
   updatedAt?: string;
   parts: ModelPart[];
 };
+
+/** Modelo del que vienen las OFs del formulario. `updatable` = se puede guardar encima sin destrozarlo. */
+export type ActiveModel = {
+  id: string;
+  name: string;
+  description: string;
+  updatedAt: string;
+  updatable: boolean;
+  reason: string | null;
+};

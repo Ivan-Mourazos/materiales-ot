@@ -770,3 +770,63 @@ button, a, input, select { touch-action: manipulation; }
   font-size: 13px;
   text-align: center;
 }
+
+/* Elegir entre actualizar el registro de origen o crear uno nuevo (modelos y borradores) */
+.save-mode-options {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.save-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  padding: 10px 12px;
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.save-mode-option:has(input:checked) {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.save-mode-option.disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.save-mode-option input {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  flex: 0 0 16px;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.save-mode-option span {
+  display: grid;
+  gap: 2px;
+}
+
+.save-mode-option strong {
+  font-size: 13.5px;
+}
+
+.save-mode-option em {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.save-mode-option.disabled em {
+  color: var(--warn-ink);
+}
