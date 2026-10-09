@@ -1,0 +1,183 @@
+/* ============================================================
+   Piezas con nombre de CoordinaOT
+   Copiadas de toldos-testar/src/client/coordina/piezas.css (traducción de
+   coordina-ot/src/app/globals.css y del JSX de Board.tsx, ViewSwitcher.tsx y
+   ThemeToggle.tsx). Se carga después de las vistas: a igual especificidad, gana.
+   ============================================================ */
+
+/* ── Chip de vidrio (globals.css 339-392) ── */
+.glass-chip {
+  background: var(--chip-bg);
+  border: 1px solid var(--control-border);
+  box-shadow: var(--chip-shadow);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.glass-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--chip-shadow-hover);
+}
+.glass-chip-activo,
+.glass-chip-activo:hover {
+  background: var(--active-bg);
+  border-color: var(--control-active-border);
+  box-shadow: var(--active-shadow);
+  color: var(--accent-ink);
+  transform: translateY(1px);
+}
+
+/* ── Cabecera: del mismo color que la página, sin raya (globals.css 807-810;
+   Board.tsx 2178 `glass-header sticky top-0 z-30 … items-center gap-3 px-5 py-2.5`) ── */
+.glass-header {
+  background: var(--bg);
+  backdrop-filter: blur(24px) saturate(1.8);
+}
+
+.cabecera {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.625rem 1.25rem;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+/* Logo: Board.tsx 2181 `-my-3 shrink-0` */
+.cabecera-logo {
+  align-items: center;
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-block: -0.75rem;
+}
+.cabecera-logo img { display: block; height: 1.75rem; width: auto; }
+.cabecera-logo .logo-oscuro { display: none; }
+:root[data-theme='dark'] .cabecera-logo .logo-claro { display: none; }
+:root[data-theme='dark'] .cabecera-logo .logo-oscuro { display: block; }
+
+/* ── Tira de pestañas: teclas sueltas, la activa hundida en dorado (globals.css 401-459;
+   ViewSwitcher.tsx `tira-3d … rounded-lg`, cada una `flex h-9 items-center gap-1.5
+   rounded-lg px-2.5 text-xs font-semibold xl:px-3.5`) ── */
+.cabecera-pestanas {
+  border-radius: 0.5rem;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.tira-3d > :not(.pestana-activa) {
+  background: var(--chip-bg);
+  border: 1px solid var(--control-border);
+  box-shadow: var(--key-shadow);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.tira-3d > :not(.pestana-activa):hover {
+  transform: translateY(-1px);
+  box-shadow: var(--key-shadow-hover);
+}
+.tira-3d > :not(.pestana-activa):active {
+  transform: translateY(1px);
+  box-shadow: var(--key-shadow-pressed);
+}
+
+.pestana {
+  align-items: center;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  gap: 0.375rem;
+  height: 2.25rem;
+  line-height: 1rem;
+  margin: 0;
+  padding: 0 0.625rem;
+  white-space: nowrap;
+}
+@media (min-width: 1280px) {
+  .pestana { padding: 0 0.875rem; }
+}
+.pestana svg { height: 1rem; width: 1rem; }
+.pestana:not(.pestana-activa) { color: var(--text-muted); }
+.pestana:not(.pestana-activa):hover { color: var(--text); }
+
+.pestana-activa {
+  background: var(--active-bg);
+  border: 1px solid var(--control-active-border);
+  box-shadow: var(--active-shadow);
+  color: var(--accent-ink);
+  transform: translateY(1px);
+}
+
+/* Contador: `rounded-full px-1.5 text-[10px] font-bold`, `bg-amber-700 text-white`
+   (o `bg-brand-400` con tinta oscura en la activa) */
+.pestana-contador {
+  background: #b45309;
+  border-radius: 9999px;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 0.375rem;
+}
+.pestana-activa .pestana-contador {
+  background: var(--color-brand-400);
+  color: var(--on-accent);
+}
+
+/* ── Derecha: Board.tsx 2217 `ml-auto flex shrink-0 items-center justify-end gap-2 text-xs` ── */
+.cabecera-derecha {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+/* Modo: ThemeToggle.tsx `glass-chip grid size-9 place-items-center rounded-lg
+   text-text-muted hover:text-text`, icono `size-4` */
+.cabecera-modo {
+  border-radius: 0.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: grid;
+  height: 2.25rem;
+  margin: 0;
+  padding: 0;
+  place-items: center;
+  width: 2.25rem;
+}
+.cabecera-modo:hover { color: var(--text); }
+.cabecera-modo svg { height: 1rem; width: 1rem; }
+
+/* Estado de la BD y de la carpeta de red: el chip de usuario de CoordinaOT (Herramientas.tsx
+   94-102 `glass-chip flex h-9 items-center gap-1.5 rounded-lg … text-xs font-semibold`),
+   con un punto de color en lugar del avatar. */
+.estado-chip {
+  align-items: center;
+  border-radius: 0.5rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  font-weight: 600;
+  gap: 0.375rem;
+  height: 2.25rem;
+  padding: 0 0.625rem;
+  white-space: nowrap;
+}
+.estado-chip:hover { transform: none; box-shadow: var(--chip-shadow); }
+.estado-chip svg { height: 0.875rem; width: 0.875rem; }
+.estado-punto {
+  background: var(--text-muted);
+  border-radius: 9999px;
+  height: 0.5rem;
+  width: 0.5rem;
+}
+.estado-chip.checking .estado-punto { animation: pulse 1.2s ease-in-out infinite; }
+.estado-chip.ok .estado-punto { background: var(--ok-ink); }
+.estado-chip.error { color: var(--danger-ink); }
+.estado-chip.error .estado-punto { background: var(--danger-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-chip, .tira-3d > *, .pestana-activa { transition: none; transform: none; }
+}

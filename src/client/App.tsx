@@ -86,31 +86,37 @@ function getInitialReservationState(): PersistedState {
   }
 }
 
+/**
+ * Tema claro u oscuro. Mientras no se elige, sigue al sistema (`system`); el botón de la
+ * cabecera, como el de CoordinaOT, pasa al contrario del que se ve y lo recuerda.
+ */
 function useTheme() {
   const [mode, setMode] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem(themeStorageKey);
     return saved === 'light' || saved === 'dark' ? saved : 'system';
   });
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = () => {
-      document.documentElement.dataset.theme =
-        mode === 'system' ? (media.matches ? 'dark' : 'light') : mode;
-    };
+    const onChange = () => setSystemDark(media.matches);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
 
-    apply();
+  const resolved: 'light' | 'dark' = mode === 'system' ? (systemDark ? 'dark' : 'light') : mode;
 
-    if (mode === 'system') {
-      localStorage.removeItem(themeStorageKey);
-      media.addEventListener('change', apply);
-      return () => media.removeEventListener('change', apply);
-    }
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolved;
+    if (mode === 'system') localStorage.removeItem(themeStorageKey);
+    else localStorage.setItem(themeStorageKey, mode);
+  }, [mode, resolved]);
 
-    localStorage.setItem(themeStorageKey, mode);
-  }, [mode]);
+  const toggle = useCallback(() => setMode(resolved === 'dark' ? 'light' : 'dark'), [resolved]);
 
-  return { mode, setMode };
+  return { resolved, toggle };
 }
 
 function useToasts() {
@@ -159,7 +165,7 @@ function App() {
   const [pendingDraftToResume, setPendingDraftToResume] = useState<OrderDraft | null>(null);
 
   const [, startTransition] = useTransition();
-  const { mode: themeMode, setMode: setThemeMode } = useTheme();
+  const { resolved: theme, toggle: toggleTheme } = useTheme();
   const { toasts, pushToast, dismissToast } = useToasts();
   const { saveVersioned, conflictDialog } = useVersionedSave();
 
@@ -825,14 +831,11 @@ function App() {
       <Header
         databaseState={databaseState}
         networkState={networkState}
-        themeMode={themeMode}
-        setThemeMode={setThemeMode}
-      />
-
-      <Navigation
-        activeTab={activeTab}
-        onChangeTab={setActiveTab}
-        draftsCount={draftsCount}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        navigation={
+          <Navigation activeTab={activeTab} onChangeTab={setActiveTab} draftsCount={draftsCount} />
+        }
       />
 
       {activeTab === 'assignments' && (
