@@ -74,7 +74,9 @@ Hoy `handleTransferModelToAssignment` recibe partes y multiplicador, pero no el 
 
 **`SaveAsModelModal`** copia el patrón ya probado de `SaveDraftModal`: dos opciones, "Actualizar «{nombre}»" (marcada por defecto) y "Guardar como modelo nuevo". Si no es actualizable, la primera sale desactivada con su motivo en una línea. "Actualizar" hace `PUT /api/models/:id`, que ya existe.
 
-**Borradores:** ya funcionan así (`activeDraft` + `saveAsNew` en `SaveDraftModal`). Solo se verifica.
+**Ida y vuelta sin degradar los nombres.** Hoy, al volcar un modelo, cada OF recibe como descripción `nombre (descripción de la parte)`, y al guardarlo como modelo ese texto pasa a ser el **nombre** de la parte. Con "Actualizar", cada ida y vuelta alargaría el nombre. Se corrige así: al volcar, la OF recibe solo `part.name` y la descripción va en un campo aparte `partDescription` (también en borradores); al guardar como modelo, la parte toma `partDescription` si existe. Efecto visible: la cabecera de la OF en el Excel pasa a ser solo el nombre de la parte.
+
+**Borradores:** ya funcionan así (`activeDraft` + `saveAsNew` en `SaveDraftModal`). Solo se verifica, y se corrige un fallo: en la pestaña Borradores, "Guardar como nueva copia" actualiza el original en vez de crear la copia.
 
 ## 5. Detección de conflictos
 
