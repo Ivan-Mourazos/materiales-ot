@@ -835,3 +835,11 @@ button, a, input, select { touch-action: manipulation; }
 .model-editor-fields > .save-mode-options {
   grid-column: 1 / -1;
 }
+
+/* Diálogos de modelo: nombre · categoría · descripción */
+.model-dialog .model-editor-fields.with-category {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 1.2fr);
+}
+@media (max-width: 760px) {
+  .model-dialog .model-editor-fields.with-category { grid-template-columns: minmax(0, 1fr); }
+}

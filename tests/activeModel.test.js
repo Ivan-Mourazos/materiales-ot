@@ -17,6 +17,7 @@ test('carga completa, ×1 y reemplazando: se puede actualizar', () => {
     id: 'm1',
     name: 'Escenario Orquesta ODL 720 EE',
     description: 'Base',
+    category: '',
     updatedAt: '2026-10-09T08:58:44.000Z',
     updatable: true,
     reason: null
@@ -42,4 +43,12 @@ test('cada trampa de la carga impide actualizar y lo explica', () => {
 test('sin updatedAt se usa createdAt como versión', () => {
   const { updatedAt } = describeActiveModel({ ...modelo, updatedAt: undefined }, { multiplier: 1, partsLoaded: 3, appendedToOtherOfs: false });
   assert.equal(updatedAt, '2026-09-16T08:44:04.000Z');
+});
+
+test('el modelo activo recuerda la categoría', () => {
+  const activo = describeActiveModel(
+    { ...modelo, category: 'Escenarios' },
+    { multiplier: 1, partsLoaded: 3, appendedToOtherOfs: false }
+  );
+  assert.equal(activo.category, 'Escenarios');
 });

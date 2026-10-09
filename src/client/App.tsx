@@ -360,7 +360,13 @@ function App() {
       setActiveModel(
         created
           ? describeActiveModel(record, { multiplier: 1, partsLoaded: record.parts.length, appendedToOtherOfs: false })
-          : { ...activeModel, name: record.name, description: record.description || '', updatedAt: record.updatedAt || activeModel.updatedAt }
+          : {
+              ...activeModel,
+              name: record.name,
+              description: record.description || '',
+              category: record.category || '',
+              updatedAt: record.updatedAt || activeModel.updatedAt
+            }
       );
       pushToast(created ? `Guardado como modelo nuevo: "${record.name}".` : `Modelo "${record.name}" actualizado.`, 'ok');
       return;

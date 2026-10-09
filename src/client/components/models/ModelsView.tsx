@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Layers, Loader2, Plus, RefreshCw, Search, X } from 'lucide-react';
 import type { AssignmentModel, ModelPart } from '../../types';
+import { listCategoryLabels } from '../../modelCategories';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { useVersionedSave } from '../common/useVersionedSave';
 import { ModelCard } from './ModelCard';
@@ -65,6 +66,7 @@ export function ModelsView({
         )
     );
   }, [models, searchQuery]);
+  const categorySuggestions = useMemo(() => listCategoryLabels(models), [models]);
 
   async function handleSaveModel(modelData: Partial<AssignmentModel>) {
     if (modelData.id) {
@@ -111,6 +113,7 @@ export function ModelsView({
       const duplicateData: Partial<AssignmentModel> = {
         name: `${model.name} (Copia)`,
         description: model.description || '',
+        category: model.category || '',
         parts: model.parts.map((p) => ({
           ...p,
           id: undefined as unknown as string,
@@ -215,6 +218,7 @@ export function ModelsView({
       {editorOpen && (
         <ModelEditorModal
           initialModel={modelToEdit}
+          categorySuggestions={categorySuggestions}
           onClose={() => {
             setEditorOpen(false);
             setModelToEdit(null);

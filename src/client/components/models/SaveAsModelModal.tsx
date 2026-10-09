@@ -4,6 +4,8 @@ import { BookmarkPlus, Save, X } from 'lucide-react';
 import type { ActiveModel, AssignmentModel, OfBlock } from '../../types';
 import { formatNumber } from '../../utils';
 import { hasQuantity } from '../../quantities';
+import { CategoryField } from './CategoryField';
+import { useCategorySuggestions } from './useCategorySuggestions';
 
 type SaveMode = 'update' | 'new';
 
@@ -21,9 +23,12 @@ export function SaveAsModelModal({
   const canUpdate = Boolean(sourceModel?.updatable);
   const initialName = canUpdate ? sourceModel?.name ?? '' : '';
   const initialDescription = canUpdate ? sourceModel?.description ?? '' : '';
+  const initialCategory = canUpdate ? sourceModel?.category ?? '' : '';
   const [mode, setMode] = useState<SaveMode>(canUpdate ? 'update' : 'new');
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
+  const [category, setCategory] = useState(initialCategory);
+  const categorySuggestions = useCategorySuggestions();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const nameRef = useRef<HTMLInputElement>(null);
@@ -58,7 +63,7 @@ export function SaveAsModelModal({
 
   function requestClose() {
     if (isSaving) return;
-    const dirty = name !== initialName || description !== initialDescription;
+    const dirty = name !== initialName || description !== initialDescription || category !== initialCategory;
     if (dirty && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return;
     onClose();
   }
@@ -72,7 +77,7 @@ export function SaveAsModelModal({
     setError('');
     setIsSaving(true);
     try {
-      await onSave({ name: name.trim(), description: description.trim(), parts: partsToSave }, mode);
+      await onSave({ name: name.trim(), description: description.trim(), category: category.trim(), parts: partsToSave }, mode);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar el modelo.');
@@ -130,7 +135,7 @@ export function SaveAsModelModal({
           </fieldset>
         )}
 
-        <div className="model-editor-fields">
+        <div className="model-editor-fields with-category">
           <label className="field">
             <span>{isUpdate ? 'Nombre del modelo *' : 'Nombre del nuevo modelo *'}</span>
             <input
@@ -142,6 +147,7 @@ export function SaveAsModelModal({
               autoComplete="off"
             />
           </label>
+          <CategoryField value={category} onChange={setCategory} suggestions={categorySuggestions} />
           <label className="field">
             <span>Descripción o notas</span>
             <input

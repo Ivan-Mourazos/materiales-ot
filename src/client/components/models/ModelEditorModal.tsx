@@ -6,18 +6,22 @@ import type { Article, AssignmentModel, ModelPart } from '../../types';
 import { formatDisplayText, uid } from '../../utils';
 import { ArticlePicker, type ArticlePickerHandle } from '../common/ArticlePicker';
 import { addQuantities, parseQuantityInput, type Quantity } from '../../quantities';
+import { CategoryField } from './CategoryField';
 
 export function ModelEditorModal({
   initialModel,
+  categorySuggestions,
   onClose,
   onSave
 }: {
   initialModel: AssignmentModel | null;
+  categorySuggestions: string[];
   onClose: () => void;
   onSave: (modelData: Partial<AssignmentModel>) => Promise<void>;
 }) {
   const [name, setName] = useState(initialModel?.name || '');
   const [description, setDescription] = useState(initialModel?.description || '');
+  const [category, setCategory] = useState(initialModel?.category || '');
   const [parts, setParts] = useState<ModelPart[]>(() => {
     if (initialModel?.parts?.length) {
       return initialModel.parts.map((p) => ({
@@ -38,12 +42,12 @@ export function ModelEditorModal({
   const [errorMessage, setErrorMessage] = useState('');
 
 
-  const [original] = useState(() => JSON.stringify({ name, description, parts }));
+  const [original] = useState(() => JSON.stringify({ name, description, category, parts }));
   const nameRef = useRef<HTMLInputElement>(null);
 
   function requestClose() {
     if (isSaving) return;
-    if (JSON.stringify({ name, description, parts }) !== original && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return;
+    if (JSON.stringify({ name, description, category, parts }) !== original && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return;
     onClose();
   }
 
@@ -154,6 +158,8 @@ export function ModelEditorModal({
         id: initialModel?.id,
         name: name.trim(),
         description: description.trim(),
+        // '' quita la categoría en el servidor
+        category: category.trim(),
         parts
       });
       onClose();
@@ -185,7 +191,7 @@ export function ModelEditorModal({
 
         {errorMessage && <div className="modal-error-banner" role="alert">{errorMessage}</div>}
 
-        <div className="model-editor-fields">
+        <div className="model-editor-fields with-category">
           <label className="field">
             <span>Nombre del modelo *</span>
             <input
@@ -197,6 +203,7 @@ export function ModelEditorModal({
               autoComplete="off"
             />
           </label>
+          <CategoryField value={category} onChange={setCategory} suggestions={categorySuggestions} />
           <label className="field">
             <span>Descripción o notas</span>
             <input

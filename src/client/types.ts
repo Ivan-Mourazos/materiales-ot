@@ -166,6 +166,8 @@ export type ActiveModel = {
   id: string;
   name: string;
   description: string;
+  /** '' = sin categoría */
+  category: string;
   updatedAt: string;
   updatable: boolean;
   reason: string | null;

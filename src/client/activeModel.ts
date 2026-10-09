@@ -11,7 +11,7 @@ type ModelLoad = {
  * Las trampas son de la CARGA: lo que se edite después sí se quiere guardar.
  */
 export function describeActiveModel(
-  model: Pick<AssignmentModel, 'id' | 'name' | 'description' | 'createdAt' | 'updatedAt' | 'parts'>,
+  model: Pick<AssignmentModel, 'id' | 'name' | 'description' | 'category' | 'createdAt' | 'updatedAt' | 'parts'>,
   load: ModelLoad
 ): ActiveModel {
   const reason =
@@ -27,6 +27,7 @@ export function describeActiveModel(
     id: model.id,
     name: model.name,
     description: model.description || '',
+    category: model.category || '',
     updatedAt: model.updatedAt || model.createdAt,
     updatable: reason === null,
     reason
