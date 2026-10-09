@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Loader2, MapPin, PackagePlus, RotateCcw, Search } from 'lucide-react';
 import type { Article, ArticleFilters, CatalogFilterState, OfBlock } from '../../types';
 import { formatDisplayText, formatNumber, formatUnitLabel } from '../../utils';
+import { parseQuantityInput, type QuantityInput } from '../../quantities';
 import { FilterSelect } from '../common/FilterSelect';
 import { StockDetailModal } from './StockDetailModal';
 
@@ -23,7 +24,7 @@ export function ArticleCatalog({
   onAddLineToOf
 }: {
   ofs: OfBlock[];
-  onAddLineToOf: (of: string, article: Article, quantity: number) => boolean;
+  onAddLineToOf: (of: string, article: Article, quantity: QuantityInput) => boolean;
 }) {
   const [filters, setFilters] = useState<CatalogFilterState>(defaultCatalogFilters);
   const [filterOptions, setFilterOptions] = useState<ArticleFilters>({
@@ -237,7 +238,7 @@ function ArticleRow({
 }: {
   article: Article;
   ofs: OfBlock[];
-  onAddLineToOf: (of: string, article: Article, quantity: number) => boolean;
+  onAddLineToOf: (of: string, article: Article, quantity: QuantityInput) => boolean;
   onOpenStock: (article: Article) => void;
 }) {
   const [quantity, setQuantity] = useState('');
@@ -255,7 +256,7 @@ function ArticleRow({
   const ofTarget = isNewOf ? newOf : selectedOf;
 
   function commitCatalogLine() {
-    const added = onAddLineToOf(ofTarget, article, Number(quantity));
+    const added = onAddLineToOf(ofTarget, article, parseQuantityInput(quantity));
     if (added) {
       setQuantity('');
       if (isNewOf) {
@@ -350,10 +351,10 @@ function ArticleRow({
                 }
               }}
               type="number"
-              min="0.000001"
+              min="0"
               step="0.01"
               aria-label="Cantidad"
-              placeholder="0"
+              placeholder="Opc."
             />
           </label>
           <button className="row-add-button" type="button" onClick={commitCatalogLine}>

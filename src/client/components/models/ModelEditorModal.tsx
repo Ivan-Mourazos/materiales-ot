@@ -3,9 +3,9 @@ import { ModelDialog } from '../common/ModelDialog';
 import { useRef, useState } from 'react';
 import { Layers, PackagePlus, Plus, Save, Trash2, X } from 'lucide-react';
 import type { Article, AssignmentModel, ModelPart } from '../../types';
-import { formatDisplayText, roundQuantity, uid } from '../../utils';
+import { formatDisplayText, uid } from '../../utils';
 import { ArticlePicker, type ArticlePickerHandle } from '../common/ArticlePicker';
-import { addQuantities } from '../../quantities';
+import { addQuantities, parseQuantityInput, type Quantity } from '../../quantities';
 
 export function ModelEditorModal({
   initialModel,
@@ -83,10 +83,9 @@ export function ModelEditorModal({
     setParts((prev) => prev.map((p) => (p.id === partId ? { ...p, description: partDesc } : p)));
   }
 
-  function addMaterialToPart(partId: string, article: Article, quantity: number) {
+  function addMaterialToPart(partId: string, article: Article, quantity: Quantity) {
     const code = article.code?.trim().toUpperCase();
     if (!code) return;
-    if (!Number.isFinite(quantity) || roundQuantity(quantity) <= 0) return;
 
     setParts((prev) =>
       prev.map((part) => {
@@ -108,7 +107,7 @@ export function ModelEditorModal({
               id: uid(),
               code,
               description: article.description || '',
-              quantity: roundQuantity(quantity),
+              quantity,
               width: article.detectedWidth ?? null,
               widthWarning: article.widthWarning ?? null
             }
@@ -128,17 +127,11 @@ export function ModelEditorModal({
     );
   }
 
-  function updateMaterialQuantity(partId: string, materialId: string, quantity: number) {
-    if (!Number.isFinite(quantity) || roundQuantity(quantity) <= 0) return;
+  function updateMaterialQuantity(partId: string, materialId: string, quantity: Quantity) {
     setParts((prev) =>
       prev.map((part) =>
         part.id === partId
-          ? {
-              ...part,
-              materials: part.materials.map((m) =>
-                m.id === materialId ? { ...m, quantity: roundQuantity(quantity) } : m
-              )
-            }
+          ? { ...part, materials: part.materials.map((m) => (m.id === materialId ? { ...m, quantity } : m)) }
           : part
       )
     );
@@ -279,9 +272,9 @@ function PartEditorCard({
   onUpdateName: (val: string) => void;
   onUpdateDescription: (val: string) => void;
   onRemovePart: () => void;
-  onAddMaterial: (article: Article, quantity: number) => void;
+  onAddMaterial: (article: Article, quantity: Quantity) => void;
   onRemoveMaterial: (matId: string) => void;
-  onUpdateMaterialQty: (matId: string, quantity: number) => void;
+  onUpdateMaterialQty: (matId: string, quantity: Quantity) => void;
 }) {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [quantity, setQuantity] = useState('');
@@ -296,9 +289,13 @@ function PartEditorCard({
         code: '',
         description: ''
       };
-    const qty = Number(quantity);
-    if (!article.code || !Number.isFinite(qty) || roundQuantity(qty) <= 0) {
-      setLineError(!article.code ? 'Selecciona un artículo o escribe su código.' : 'Introduce una cantidad mayor que cero.');
+    const qty = parseQuantityInput(quantity);
+    if (!article.code) {
+      setLineError('Selecciona un artículo o escribe su código.');
+      return;
+    }
+    if (qty === 'invalid') {
+      setLineError('La cantidad no es válida.');
       return;
     }
     setLineError('');
@@ -345,7 +342,7 @@ function PartEditorCard({
           <span>Cant. base</span>
           <input
             type="number"
-            min="0.000001"
+            min="0"
             step="0.01"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
@@ -355,7 +352,7 @@ function PartEditorCard({
                 handleAddLine();
               }
             }}
-            placeholder="0"
+            placeholder="Opcional"
           />
         </label>
         <button className="button button-secondary" type="button" onClick={handleAddLine}>

@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
-import type { MaterialLine, OfBlock } from '../../types';
+import type { OfBlock } from '../../types';
 import { formatDisplayText } from '../../utils';
-import { hasQuantity, quantityInputValue } from '../../quantities';
+import { hasQuantity, parseQuantityInput, quantityInputValue, type Quantity } from '../../quantities';
 
 export function MaterialTable({
   ofBlock,
@@ -11,7 +11,7 @@ export function MaterialTable({
 }: {
   ofBlock: OfBlock;
   onRemoveLine: (ofId: string, lineId: string) => void;
-  onUpdateQuantity: (lineId: string, quantity: number) => void;
+  onUpdateQuantity: (lineId: string, quantity: Quantity) => void;
 }) {
   return (
     <div className="materials-table-wrap">
@@ -71,8 +71,8 @@ export function QuantityCell({
   line,
   onCommit
 }: {
-  line: MaterialLine;
-  onCommit: (quantity: number) => void;
+  line: { id: string; code: string; quantity: Quantity };
+  onCommit: (quantity: Quantity) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const cancelledRef = useRef(false);
@@ -84,8 +84,9 @@ export function QuantityCell({
       return;
     }
     if (draft === null) return;
-    const quantity = Number(draft.replace(',', '.'));
-    if (Number.isFinite(quantity) && quantity > 0 && quantity !== line.quantity) {
+    const quantity = parseQuantityInput(draft);
+    // Vaciar el campo es válido: la línea queda sin cantidad
+    if (quantity !== 'invalid' && quantity !== line.quantity) {
       onCommit(quantity);
     }
     setDraft(null);
@@ -113,7 +114,7 @@ export function QuantityCell({
         }
       }}
       type="number"
-      min="0.000001"
+      min="0"
       step="0.01"
       aria-label={`Cantidad de ${line.code}`}
     />

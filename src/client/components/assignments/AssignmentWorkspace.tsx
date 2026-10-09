@@ -1,5 +1,6 @@
 import { FileClock, Save, X } from 'lucide-react';
 import type { Article, OfBlock } from '../../types';
+import type { Quantity, QuantityInput } from '../../quantities';
 import { OfCard } from './OfCard';
 import { SummaryPanel } from './SummaryPanel';
 
@@ -44,9 +45,9 @@ export function AssignmentWorkspace({
   onUpdateOf: (id: string, of: string) => void;
   onUpdateOfDescription: (id: string, description: string) => void;
   onRemoveOf: (id: string) => void;
-  onAddLine: (ofId: string, article: Article, quantity: number) => boolean;
+  onAddLine: (ofId: string, article: Article, quantity: QuantityInput) => boolean;
   onRemoveLine: (ofId: string, lineId: string) => void;
-  onUpdateLineQuantity: (ofId: string, lineId: string, quantity: number) => void;
+  onUpdateLineQuantity: (ofId: string, lineId: string, quantity: Quantity) => void;
 }) {
   return (
     <section className="workspace view" key="assignments">

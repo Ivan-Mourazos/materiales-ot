@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { AlertTriangle, PackagePlus, Trash2 } from 'lucide-react';
 import type { Article, OfBlock } from '../../types';
 import { formatDisplayText } from '../../utils';
+import { parseQuantityInput, type Quantity, type QuantityInput } from '../../quantities';
 import { ArticlePicker, type ArticlePickerHandle } from '../common/ArticlePicker';
 import { MaterialTable } from './MaterialTable';
 
@@ -22,9 +23,9 @@ export function OfCard({
   onChangeOf: (id: string, of: string) => void;
   onChangeDescription: (id: string, description: string) => void;
   onRemoveOf: (id: string) => void;
-  onAddLine: (ofId: string, article: Article, quantity: number) => boolean;
+  onAddLine: (ofId: string, article: Article, quantity: QuantityInput) => boolean;
   onRemoveLine: (ofId: string, lineId: string) => void;
-  onUpdateLineQuantity: (ofId: string, lineId: string, quantity: number) => void;
+  onUpdateLineQuantity: (ofId: string, lineId: string, quantity: Quantity) => void;
 }) {
   const [quantity, setQuantity] = useState('');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
@@ -38,7 +39,7 @@ export function OfCard({
         code: '',
         description: ''
       };
-    const added = onAddLine(ofBlock.id, article, Number(quantity));
+    const added = onAddLine(ofBlock.id, article, parseQuantityInput(quantity));
     if (!added) return;
     setSelectedArticle(null);
     setQuantity('');
@@ -98,9 +99,9 @@ export function OfCard({
                 commitLine();
               }
             }}
-            placeholder="0"
+            placeholder="Opcional"
             type="number"
-            min="0.000001"
+            min="0"
             step="0.01"
           />
         </label>

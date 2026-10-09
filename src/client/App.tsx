@@ -18,7 +18,15 @@ import type {
   ToastType
 } from './types';
 import { roundQuantity, uid } from './utils';
-import { addQuantities, countMissingQuantities, hasQuantity, scaleQuantity, sumQuantities } from './quantities';
+import {
+  addQuantities,
+  countMissingQuantities,
+  hasQuantity,
+  scaleQuantity,
+  sumQuantities,
+  type Quantity,
+  type QuantityInput
+} from './quantities';
 
 import { Header } from './components/Header';
 import { Navigation, type ActiveTab } from './components/Navigation';
@@ -447,15 +455,15 @@ function App() {
     pushToast('Borrador desvinculado. Los materiales se mantienen en la pantalla.', 'info');
   }
 
-  function addLine(ofId: string, article: Article, quantity: number) {
+  function addLine(ofId: string, article: Article, quantity: QuantityInput) {
     const code = String(article.code || '').trim().toUpperCase();
     if (!code) {
       pushToast('Selecciona o escribe un artículo.', 'error');
       return false;
     }
 
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      pushToast('La cantidad debe ser mayor que cero.', 'error');
+    if (quantity === 'invalid') {
+      pushToast('La cantidad no es válida.', 'error');
       return false;
     }
 
@@ -483,7 +491,7 @@ function App() {
               id: uid(),
               code,
               description: article.description || '',
-              quantity: roundQuantity(quantity),
+              quantity,
               width: article.detectedWidth ?? null,
               widthWarning: article.widthWarning ?? null
             }
@@ -494,13 +502,15 @@ function App() {
 
     if (article.widthWarning) {
       pushToast(`Línea añadida. Aviso: ${article.widthWarning}`, 'warn');
+    } else if (quantity === null) {
+      pushToast('Línea añadida sin cantidad: complétala antes de generar.', 'info');
     } else {
       pushToast('Línea añadida.', 'ok');
     }
     return true;
   }
 
-  function addLineByOfValue(ofValue: string, article: Article, quantity: number) {
+  function addLineByOfValue(ofValue: string, article: Article, quantity: QuantityInput) {
     const of = ofValue.trim();
     const code = String(article.code || '').trim().toUpperCase();
 
@@ -514,8 +524,8 @@ function App() {
       return false;
     }
 
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      pushToast('La cantidad debe ser mayor que cero.', 'error');
+    if (quantity === 'invalid') {
+      pushToast('La cantidad no es válida.', 'error');
       return false;
     }
 
@@ -526,7 +536,7 @@ function App() {
         id: uid(),
         code,
         description: article.description || '',
-        quantity: roundQuantity(quantity),
+        quantity,
         width: article.detectedWidth ?? null,
         widthWarning: article.widthWarning ?? null
       };
@@ -561,6 +571,8 @@ function App() {
 
     if (article.widthWarning) {
       pushToast(`Línea añadida a OF ${of}. Aviso: ${article.widthWarning}`, 'warn');
+    } else if (quantity === null) {
+      pushToast(`Línea añadida a OF ${of} sin cantidad.`, 'info');
     } else {
       pushToast(`Línea añadida a OF ${of}.`, 'ok');
     }
@@ -577,15 +589,13 @@ function App() {
     );
   }
 
-  function updateLineQuantity(ofId: string, lineId: string, quantity: number) {
+  function updateLineQuantity(ofId: string, lineId: string, quantity: Quantity) {
     setOfs((current) =>
       current.map((ofBlock) =>
         ofBlock.id === ofId
           ? {
               ...ofBlock,
-              materials: ofBlock.materials.map((line) =>
-                line.id === lineId ? { ...line, quantity: roundQuantity(quantity) } : line
-              )
+              materials: ofBlock.materials.map((line) => (line.id === lineId ? { ...line, quantity } : line))
             }
           : ofBlock
       )
