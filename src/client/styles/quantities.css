@@ -8,6 +8,17 @@
   background: var(--warn-soft);
 }
 
+/* Pasar el ratón conserva el aviso con borde más marcado; el foco recupera
+   el tratamiento normal de una celda (borde de acento y anillo). */
+.quantity-cell-input.quantity-missing:hover {
+  border-color: var(--warn-ink);
+}
+
+.quantity-cell-input.quantity-missing:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
 .quantity-cell-input.quantity-missing::placeholder {
   color: var(--warn-ink);
   opacity: 0.85;
@@ -20,7 +31,8 @@
   font-weight: 550;
 }
 
-.history-chip.missing-chip {
+.history-chip.missing-chip,
+.model-meta .history-chip.missing-chip {
   border-color: var(--warn-border);
   background: var(--warn-soft);
   color: var(--warn-ink);
