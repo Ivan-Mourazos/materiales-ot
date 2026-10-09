@@ -154,6 +154,8 @@ export type AssignmentModel = {
   id: string;
   name: string;
   description?: string;
+  /** Familia de producto (texto libre). Ausente = "Sin categoría". */
+  category?: string;
   createdAt: string;
   updatedAt?: string;
   parts: ModelPart[];
