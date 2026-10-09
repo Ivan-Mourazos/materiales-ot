@@ -21,9 +21,11 @@ import { roundQuantity, uid } from './utils';
 import {
   addQuantities,
   countMissingQuantities,
+  findMissingQuantities,
   hasQuantity,
   scaleQuantity,
   sumQuantities,
+  type MissingQuantity,
   type Quantity,
   type QuantityInput
 } from './quantities';
@@ -33,6 +35,7 @@ import { Navigation, type ActiveTab } from './components/Navigation';
 import { AssignmentWorkspace } from './components/assignments/AssignmentWorkspace';
 import { ArticleCatalog } from './components/catalog/ArticleCatalog';
 import { ConfirmDialog } from './components/common/ConfirmDialog';
+import { MissingQuantitiesDialog } from './components/common/MissingQuantitiesDialog';
 import { ToastViewport } from './components/common/ToastViewport';
 import { HistoryView } from './components/history/HistoryView';
 import { ModelsView } from './components/models/ModelsView';
@@ -131,6 +134,7 @@ function App() {
   const [isSavingToNetwork, setIsSavingToNetwork] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('assignments');
   const [overwritePrompt, setOverwritePrompt] = useState<string[] | null>(null);
+  const [missingQuantities, setMissingQuantities] = useState<MissingQuantity[] | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [isSaveAsModelOpen, setIsSaveAsModelOpen] = useState(false);
   const [modelModalOfs, setModelModalOfs] = useState<OfBlock[] | null>(null);
@@ -624,12 +628,29 @@ function App() {
     }
   }
 
+  function goToMissingLine(item: MissingQuantity) {
+    setMissingQuantities(null);
+    // Tras cerrar el aviso: llevar la OF a la vista y dejar el cursor en el campo
+    window.setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>(`[data-line-id="${CSS.escape(item.lineId)}"]`);
+      if (!input) return;
+      input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      input.focus({ preventScroll: true });
+    }, 0);
+  }
+
   async function saveExcelToNetwork(confirmOverwrite = false) {
     if (duplicateOfs.size > 0) {
       pushToast(
         `Hay OFs repetidas: ${Array.from(duplicateOfs).join(', ')}. Corrige los números antes de generar.`,
         'error'
       );
+      return;
+    }
+
+    const missing = findMissingQuantities(ofs);
+    if (missing.length > 0) {
+      setMissingQuantities(missing);
       return;
     }
 
@@ -826,6 +847,14 @@ function App() {
             setOverwritePrompt(null);
             saveExcelToNetwork(true);
           }}
+        />
+      )}
+
+      {missingQuantities && (
+        <MissingQuantitiesDialog
+          items={missingQuantities}
+          onClose={() => setMissingQuantities(null)}
+          onGoTo={goToMissingLine}
         />
       )}
 
