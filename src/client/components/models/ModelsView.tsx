@@ -29,6 +29,7 @@ function readLibraryView(): LibraryView {
 
 export function ModelsView({
   onTransferModelToAssignment,
+  onRecordSaved,
   pushToast
 }: {
   onTransferModelToAssignment: (
@@ -36,6 +37,8 @@ export function ModelsView({
     partsToTransfer: { part: ModelPart; multiplier: number }[],
     replaceExisting: boolean
   ) => void;
+  /** Tras actualizar un modelo: si es el cargado en Asignaciones, App refresca su versión. */
+  onRecordSaved: (model: AssignmentModel) => void;
   pushToast: (text: string, type?: 'ok' | 'error' | 'warn' | 'info') => void;
 }) {
   const [models, setModels] = useState<AssignmentModel[]>([]);
@@ -144,7 +147,7 @@ export function ModelsView({
 
   async function handleSaveModel(modelData: Partial<AssignmentModel>) {
     if (modelData.id) {
-      const { created } = await saveVersioned<AssignmentModel>({
+      const { record, created } = await saveVersioned<AssignmentModel>({
         kind: 'modelo',
         collectionUrl: '/api/models',
         responseKey: 'model',
@@ -153,6 +156,7 @@ export function ModelsView({
         body: { ...modelData },
         expectedUpdatedAt: modelToEdit?.updatedAt || modelToEdit?.createdAt
       });
+      if (!created) onRecordSaved(record);
       pushToast(created ? `Guardado como modelo nuevo: "${modelData.name} (copia)".` : 'Modelo actualizado correctamente.', 'ok');
     } else {
       const response = await fetch('/api/models', {

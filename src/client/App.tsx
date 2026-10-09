@@ -290,6 +290,27 @@ function App() {
     pushToast('Materiales cargados desde el historial. Escribe las nuevas OFs y el pedido.', 'info');
   }
 
+  // Un borrador o modelo abierto aquí se ha guardado desde su pestaña. Sin esto, el siguiente
+  // "Guardar cambios" usaría la versión vieja y avisaría de un conflicto que no existe.
+  // Solo cambian nombre, notas y versión: el contenido del formulario no se toca.
+  function handleDraftSaved(draft: OrderDraft) {
+    setActiveDraft((current) => (current?.id === draft.id ? toActiveDraft(draft) : current));
+  }
+
+  function handleModelSaved(model: AssignmentModel) {
+    setActiveModel((current) =>
+      current?.id === model.id
+        ? {
+            ...current,
+            name: model.name,
+            description: model.description || '',
+            category: model.category || '',
+            updatedAt: model.updatedAt || model.createdAt
+          }
+        : current
+    );
+  }
+
   function handleTransferModelToAssignment(
     model: AssignmentModel,
     partsToTransfer: { part: ModelPart; multiplier: number }[],
@@ -297,6 +318,9 @@ function App() {
   ) {
     const previousOfs = ofs;
     const previousActiveModel = activeModel;
+    const previousActiveDraft = activeDraft;
+    // Reemplazar deja el formulario con el modelo: "Guardar cambios" no debe pisar el borrador con él
+    const unlinkedDraft = replaceExisting ? activeDraft : null;
     const hadOtherContent = ofs.some((b) => b.of.trim() || b.description.trim() || b.materials.length > 0);
     const newOfBlocks: OfBlock[] = partsToTransfer.map(({ part, multiplier }) => ({
       id: uid(),
@@ -326,10 +350,14 @@ function App() {
         appendedToOtherOfs: !replaceExisting && hadOtherContent
       })
     );
+    if (unlinkedDraft) setActiveDraft(null);
 
     setActiveTab('assignments');
+    const loaded = `${partsToTransfer.length} ${partsToTransfer.length === 1 ? 'parte cargada' : 'partes cargadas'}.`;
     pushToast(
-      `${partsToTransfer.length} ${partsToTransfer.length === 1 ? 'parte cargada' : 'partes cargadas'}. Completa los números de OF y el pedido.`,
+      unlinkedDraft
+        ? `${loaded} Borrador «${unlinkedDraft.name}» desvinculado: el formulario ahora contiene el modelo.`
+        : `${loaded} Completa los números de OF y el pedido.`,
       'ok',
       replaceExisting
         ? {
@@ -337,6 +365,7 @@ function App() {
             run: () => {
               setOfs(previousOfs);
               setActiveModel(previousActiveModel);
+              setActiveDraft(previousActiveDraft);
             }
           }
         : undefined
@@ -833,6 +862,7 @@ function App() {
           onResumeDraft={(draft) => resumeDraft(draft)}
           onSaveCurrentAsDraft={() => setIsSaveDraftOpen(true)}
           onConvertToModel={handleDraftToModel}
+          onRecordSaved={handleDraftSaved}
           pushToast={pushToast}
           refreshTrigger={draftsVersion}
         />
@@ -841,6 +871,7 @@ function App() {
       {activeTab === 'models' && (
         <ModelsView
           onTransferModelToAssignment={handleTransferModelToAssignment}
+          onRecordSaved={handleModelSaved}
           pushToast={pushToast}
         />
       )}

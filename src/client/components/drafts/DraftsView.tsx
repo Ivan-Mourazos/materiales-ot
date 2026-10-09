@@ -19,6 +19,7 @@ export function DraftsView({
   onResumeDraft,
   onSaveCurrentAsDraft,
   onConvertToModel,
+  onRecordSaved,
   pushToast,
   refreshTrigger
 }: {
@@ -27,6 +28,8 @@ export function DraftsView({
   onResumeDraft: (draft: OrderDraft) => void;
   onSaveCurrentAsDraft: () => void;
   onConvertToModel: (draft: OrderDraft) => void;
+  /** Tras actualizar un borrador: si es el abierto en Asignaciones, App refresca su versión. */
+  onRecordSaved: (draft: OrderDraft) => void;
   pushToast: (text: string, type?: 'ok' | 'error' | 'warn' | 'info') => void;
   refreshTrigger?: number;
 }) {
@@ -143,7 +146,7 @@ export function DraftsView({
       }
       pushToast(`Copia guardada como "${updatedData.name}".`, 'ok');
     } else {
-      const { created } = await saveVersioned<OrderDraft>({
+      const { record, created } = await saveVersioned<OrderDraft>({
         kind: 'borrador',
         collectionUrl: '/api/drafts',
         responseKey: 'draft',
@@ -152,6 +155,7 @@ export function DraftsView({
         body,
         expectedUpdatedAt: draftToEdit.updatedAt
       });
+      if (!created) onRecordSaved(record);
       pushToast(created ? `Guardado como borrador nuevo: "${updatedData.name} (copia)".` : 'Borrador actualizado.', 'ok');
     }
 
