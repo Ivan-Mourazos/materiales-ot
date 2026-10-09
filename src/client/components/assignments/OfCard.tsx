@@ -28,7 +28,7 @@ export function OfCard({
   onUpdateLineQuantity: (ofId: string, lineId: string, quantity: Quantity) => void;
 }) {
   const [quantity, setQuantity] = useState('');
-  const [quantityBadInput, setQuantityBadInput] = useState(false);
+  const quantityRef = useRef<HTMLInputElement>(null);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const pickerRef = useRef<ArticlePickerHandle>(null);
 
@@ -40,11 +40,12 @@ export function OfCard({
         code: '',
         description: ''
       };
-    const added = onAddLine(ofBlock.id, article, quantityBadInput ? 'invalid' : parseQuantityInput(quantity));
+    // "-" o "1e" a medias: el campo dice "vacío" pero no es "sin cantidad"
+    const qty = quantityRef.current?.validity.badInput ? 'invalid' : parseQuantityInput(quantity);
+    const added = onAddLine(ofBlock.id, article, qty);
     if (!added) return;
     setSelectedArticle(null);
     setQuantity('');
-    setQuantityBadInput(false);
     pickerRef.current?.clear();
   }
 
@@ -93,11 +94,9 @@ export function OfCard({
         <label className="field quantity-field">
           <span>Cantidad</span>
           <input
+            ref={quantityRef}
             value={quantity}
-            onChange={(event) => {
-              setQuantity(event.currentTarget.value);
-              setQuantityBadInput(event.currentTarget.validity.badInput);
-            }}
+            onChange={(event) => setQuantity(event.currentTarget.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();

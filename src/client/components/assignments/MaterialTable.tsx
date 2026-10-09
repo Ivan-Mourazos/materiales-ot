@@ -76,19 +76,17 @@ export function QuantityCell({
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const cancelledRef = useRef(false);
-  // En un input numérico, "-" o "1e" llegan como valor vacío pero con badInput:
-  // no son "sin cantidad", son texto a medio teclear y no deben borrar la cantidad.
-  const badInputRef = useRef(false);
-
-  function commit() {
+  function commit(input: HTMLInputElement) {
     if (cancelledRef.current) {
       cancelledRef.current = false;
-      badInputRef.current = false;
       setDraft(null);
       return;
     }
-    if (badInputRef.current) {
-      badInputRef.current = false;
+    // "-" o "1e" llegan como valor vacío pero con badInput: no son "sin cantidad", son
+    // texto a medio teclear. Se lee al confirmar porque React no avisa si el valor sigue vacío.
+    if (input.validity.badInput) {
+      // Volver a pintar la cantidad: React cree que el campo ya muestra eso y no lo repintaría
+      input.value = quantityInputValue(line.quantity);
       setDraft(null);
       return;
     }
@@ -107,12 +105,9 @@ export function QuantityCell({
       data-line-id={line.id}
       value={draft ?? quantityInputValue(line.quantity)}
       placeholder="Sin cantidad"
-      onChange={(event) => {
-        badInputRef.current = event.currentTarget.validity.badInput;
-        setDraft(event.currentTarget.value);
-      }}
+      onChange={(event) => setDraft(event.currentTarget.value)}
       onFocus={(event) => event.target.select()}
-      onBlur={commit}
+      onBlur={(event) => commit(event.currentTarget)}
       onKeyDown={(event) => {
         if (event.key === 'Enter') {
           event.preventDefault();

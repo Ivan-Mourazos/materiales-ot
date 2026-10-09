@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Loader2, MapPin, PackagePlus, RotateCcw, Search } from 'lucide-react';
 import type { Article, ArticleFilters, CatalogFilterState, OfBlock } from '../../types';
 import { formatDisplayText, formatNumber, formatUnitLabel } from '../../utils';
@@ -242,7 +242,7 @@ function ArticleRow({
   onOpenStock: (article: Article) => void;
 }) {
   const [quantity, setQuantity] = useState('');
-  const [quantityBadInput, setQuantityBadInput] = useState(false);
+  const quantityRef = useRef<HTMLInputElement>(null);
   const writtenOfs = useMemo(
     () =>
       ofs.flatMap((ofBlock) => {
@@ -257,10 +257,11 @@ function ArticleRow({
   const ofTarget = isNewOf ? newOf : selectedOf;
 
   function commitCatalogLine() {
-    const added = onAddLineToOf(ofTarget, article, quantityBadInput ? 'invalid' : parseQuantityInput(quantity));
+    // "-" o "1e" a medias: el campo dice "vacío" pero no es "sin cantidad"
+    const qty = quantityRef.current?.validity.badInput ? 'invalid' : parseQuantityInput(quantity);
+    const added = onAddLineToOf(ofTarget, article, qty);
     if (added) {
       setQuantity('');
-      setQuantityBadInput(false);
       if (isNewOf) {
         setSelectedOf('');
         setNewOf('');
@@ -344,11 +345,9 @@ function ArticleRow({
           <label className="row-add-field quantity">
             <span>Cant.</span>
             <input
+              ref={quantityRef}
               value={quantity}
-              onChange={(event) => {
-                setQuantity(event.currentTarget.value);
-                setQuantityBadInput(event.currentTarget.validity.badInput);
-              }}
+              onChange={(event) => setQuantity(event.currentTarget.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();

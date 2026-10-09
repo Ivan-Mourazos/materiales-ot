@@ -285,7 +285,7 @@ function PartEditorCard({
 }) {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [quantity, setQuantity] = useState('');
-  const [quantityBadInput, setQuantityBadInput] = useState(false);
+  const quantityRef = useRef<HTMLInputElement>(null);
   const pickerRef = useRef<ArticlePickerHandle>(null);
   const [lineError, setLineError] = useState('');
 
@@ -297,7 +297,8 @@ function PartEditorCard({
         code: '',
         description: ''
       };
-    const qty = quantityBadInput ? 'invalid' : parseQuantityInput(quantity);
+    // "-" o "1e" a medias: el campo dice "vacío" pero no es "sin cantidad"
+    const qty = quantityRef.current?.validity.badInput ? 'invalid' : parseQuantityInput(quantity);
     if (!article.code) {
       setLineError('Selecciona un artículo o escribe su código.');
       return;
@@ -310,7 +311,6 @@ function PartEditorCard({
     onAddMaterial(article, qty);
     setSelectedArticle(null);
     setQuantity('');
-    setQuantityBadInput(false);
     pickerRef.current?.clear();
   }
 
@@ -350,14 +350,12 @@ function PartEditorCard({
         <label className="field editor-part-qty">
           <span>Cant. base</span>
           <input
+            ref={quantityRef}
             type="number"
             min="0"
             step="0.01"
             value={quantity}
-            onChange={(e) => {
-              setQuantity(e.currentTarget.value);
-              setQuantityBadInput(e.currentTarget.validity.badInput);
-            }}
+            onChange={(e) => setQuantity(e.currentTarget.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
