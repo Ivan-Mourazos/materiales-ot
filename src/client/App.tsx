@@ -333,6 +333,7 @@ function App() {
       id: block.id || uid(),
       of: block.of || '',
       description: block.description || '',
+      ...(block.partDescription !== undefined ? { partDescription: block.partDescription } : {}),
       materials: block.materials.map((m) => ({
         id: m.id || uid(),
         code: m.code,
@@ -434,6 +435,7 @@ function App() {
       id: block.id || uid(),
       of: block.of || '',
       description: block.description || '',
+      ...(block.partDescription !== undefined ? { partDescription: block.partDescription } : {}),
       materials: block.materials.map((m) => ({ ...m }))
     }));
     setModelModalOfs(draftOfs);
