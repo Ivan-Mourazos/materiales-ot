@@ -72,7 +72,7 @@
 }
 
 .checkbox-field:has(input:focus-visible) {
-  border-color: var(--accent);
+  border-color: var(--control-active-border);
   box-shadow: var(--ring);
 }
 
@@ -159,7 +159,7 @@
 }
 
 .apple-select-trigger.open {
-  border-color: var(--accent);
+  border-color: var(--control-active-border);
   box-shadow: var(--ring);
 }
 
@@ -529,7 +529,7 @@
 .series-badge-button:hover .series-badge {
   border-color: transparent;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .catalog-series-cell.muted,
@@ -640,7 +640,7 @@
 .row-add-button:hover {
   border-color: transparent;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .row-add-button:active {

@@ -15,7 +15,7 @@
 }
 
 .quantity-cell-input.quantity-missing:focus {
-  border-color: var(--accent);
+  border-color: var(--control-active-border);
   box-shadow: var(--ring);
 }
 
