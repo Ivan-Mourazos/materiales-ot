@@ -1,6 +1,6 @@
 {
   "name": "materiales-ot",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Web app para generar reservas de materiales desde una base de datos de articulos.",
