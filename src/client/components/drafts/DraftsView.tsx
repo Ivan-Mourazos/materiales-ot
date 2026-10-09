@@ -7,14 +7,13 @@ import {
   Search,
   X
 } from 'lucide-react';
-import type { OrderDraft } from '../../types';
+import type { OfBlock, OrderDraft } from '../../types';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { DraftCard } from './DraftCard';
 import { SaveDraftModal } from './SaveDraftModal';
 
 export function DraftsView({
   activeDraftId,
-  currentOrderCode,
   hasActiveContent,
   onResumeDraft,
   onSaveCurrentAsDraft,
@@ -23,7 +22,6 @@ export function DraftsView({
   refreshTrigger
 }: {
   activeDraftId: string | null;
-  currentOrderCode: string;
   hasActiveContent: boolean;
   onResumeDraft: (draft: OrderDraft) => void;
   onSaveCurrentAsDraft: () => void;
@@ -123,7 +121,7 @@ export function DraftsView({
     name: string;
     orderCode: string;
     notes?: string;
-    ofs: any[];
+    ofs: OfBlock[];
   }) {
     if (!draftToEdit?.id) return;
     const response = await fetch(`/api/drafts/${draftToEdit.id}`, {
@@ -207,7 +205,7 @@ export function DraftsView({
           <FileClock aria-hidden="true" />
           {searchQuery ? (
             <>
-              <h3>No hay resultados para "{searchQuery}"</h3>
+              <h3>No hay resultados para “{searchQuery}”</h3>
               <p>Prueba con otros términos de búsqueda.</p>
               <button
                 className="button button-muted"
@@ -223,7 +221,7 @@ export function DraftsView({
               <p>
                 Puedes empezar a preparar cualquier pedido o modelo en la pestaña principal
                 (<strong>Asignaciones</strong>) y guardarlo a medias con el botón{' '}
-                <em>"Guardar borrador"</em> para continuar más tarde aquí.
+                <em>“Guardar borrador”</em> para continuar más tarde aquí.
               </p>
               {hasActiveContent && (
                 <button
@@ -261,7 +259,7 @@ export function DraftsView({
           title="¿Eliminar este borrador?"
           description={
             <>
-              Se eliminará de forma definitiva el borrador <strong>"{draftToDelete.name}"</strong> y sus líneas asociadas.
+              Se eliminará de forma definitiva el borrador <strong>“{draftToDelete.name}”</strong> y sus líneas asociadas.
             </>
           }
           items={[]}

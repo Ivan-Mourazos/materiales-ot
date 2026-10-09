@@ -4,7 +4,6 @@ import {
   ChevronDown,
   Copy,
   Edit2,
-  FileClock,
   Layers,
   Play,
   Trash2

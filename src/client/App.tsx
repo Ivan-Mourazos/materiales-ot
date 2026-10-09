@@ -725,7 +725,6 @@ function App() {
       {activeTab === 'drafts' && (
         <DraftsView
           activeDraftId={activeDraft?.id || null}
-          currentOrderCode={orderCode}
           hasActiveContent={Boolean(orderCode.trim()) || ofs.some((b) => b.of.trim() || b.materials.length > 0)}
           onResumeDraft={(draft) => resumeDraft(draft)}
           onSaveCurrentAsDraft={() => setIsSaveDraftOpen(true)}
@@ -782,7 +781,7 @@ function App() {
             <>
               Tienes materiales en la pantalla de <strong>Asignaciones</strong>.
               <br />
-              ¿Quieres descartar el trabajo actual y abrir el borrador <strong>"{pendingDraftToResume.name}"</strong>?
+              ¿Quieres descartar el trabajo actual y abrir el borrador <strong>“{pendingDraftToResume.name}”</strong>?
             </>
           }
           items={[]}
