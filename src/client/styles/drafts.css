@@ -24,21 +24,23 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: var(--chip-bg);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-s);
   padding: 8px 14px;
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--chip-shadow);
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .drafts-search-box:focus-within {
   border-color: var(--control-active-border);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
 }
 
 .drafts-search-box input {
   border: none;
+  box-shadow: none;
   background: transparent;
   width: 100%;
   font-size: 14px;
@@ -233,9 +235,9 @@
 }
 
 .draft-resume-button {
-  background: var(--accent);
+  background: var(--color-brand-400);
   color: var(--on-accent);
-  border: none;
+  border: 1px solid var(--control-active-border);
   border-radius: var(--radius-s);
   padding: 7px 14px;
   font-size: 13px;
@@ -244,13 +246,20 @@
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: background 150ms ease, transform 100ms ease;
+  box-shadow: var(--solid-shadow);
+  transition: background-color 140ms ease, box-shadow 120ms ease, transform 120ms ease;
   white-space: nowrap;
 }
 
 .draft-resume-button:hover {
-  background: var(--accent-strong);
+  background: var(--color-brand-300);
+  box-shadow: var(--solid-shadow-hover);
   transform: translateY(-1px);
+}
+
+.draft-resume-button:active {
+  box-shadow: var(--solid-shadow-pressed);
+  transform: translateY(1px);
 }
 
 .draft-resume-button svg {

@@ -181,3 +181,33 @@
 @media (prefers-reduced-motion: reduce) {
   .glass-chip, .tira-3d > *, .pestana-activa { transition: none; transform: none; }
 }
+
+/* ── Paneles y tarjetas: `glass-panel rounded-xl` (globals.css 248-272; TecnicoCard.tsx 67),
+   sin `backdrop-filter` (como `.panel-vidrio` de Planteamientos: sobre el fondo liso no hay
+   nada que desenfocar, y un filtro haría de bloque contenedor de los desplegables fijos). ── */
+.summary-panel,
+.of-card,
+.catalog-panel,
+.catalog-table-wrap,
+.model-card,
+.draft-card,
+.history-card {
+  background: var(--panel-bg);
+  border-color: var(--glass-border);
+  border-radius: 0.75rem;
+  box-shadow: var(--panel-shadow);
+}
+
+/* Al pasar el ratón o abrir, CoordinaOT no cambia la sombra: solo el borde */
+.model-card:hover,
+.draft-card:hover,
+.history-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--panel-shadow);
+}
+
+.model-card.open,
+.draft-card.open,
+.history-card.open {
+  box-shadow: var(--panel-shadow);
+}

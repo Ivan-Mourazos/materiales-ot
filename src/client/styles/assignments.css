@@ -54,16 +54,20 @@
   font-weight: 600;
 }
 
+/* Campos: la pieza `glass-chip` que CoordinaOT pone a su buscador (FilterBar.tsx 229) y a sus
+   desplegables (Select.tsx 226), sin levantarse al pasar el ratón (como en Planteamientos,
+   nuevo-pedido.css 80-106). */
 input,
 select {
   width: 100%;
   min-height: 38px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-s);
   padding: 8px 11px;
-  background: var(--input-bg);
-  color: var(--ink);
-  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+  background: var(--chip-bg);
+  box-shadow: var(--chip-shadow);
+  color: var(--text);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 input::placeholder {
@@ -81,15 +85,14 @@ select {
   cursor: pointer;
 }
 
-input:hover,
-select:hover {
-  border-color: var(--border-strong);
+input:hover:not(:disabled):not([readonly]),
+select:hover:not(:disabled) {
+  border-color: var(--control-border-hover);
 }
 
 input:focus,
 select:focus {
   border-color: var(--control-active-border);
-  box-shadow: var(--ring);
 }
 
 /* --- métricas --- */
@@ -205,6 +208,12 @@ select:focus {
 .icon-button svg {
   width: 17px;
   height: 17px;
+}
+
+/* Como los iconos de las tarjetas de CoordinaOT: sin fondo hasta pasar el ratón */
+.icon-button:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .icon-button.danger:hover {
