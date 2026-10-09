@@ -95,6 +95,11 @@ select:focus {
   border-color: var(--control-active-border);
 }
 
+/* Casillas y opciones no son campos: sin el relieve de chip */
+input:is([type='checkbox'], [type='radio']) {
+  box-shadow: none;
+}
+
 /* --- métricas --- */
 
 .metrics {

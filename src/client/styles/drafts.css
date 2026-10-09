@@ -38,6 +38,11 @@
   outline-offset: 1px;
 }
 
+/* El anillo lo lleva la caja: el campo de dentro no dibuja otro */
+.drafts-search-box input:focus-visible {
+  outline: none;
+}
+
 .drafts-search-box input {
   border: none;
   box-shadow: none;

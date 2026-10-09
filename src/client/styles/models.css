@@ -643,6 +643,8 @@
 .models-search-box { padding: 3px 10px; max-width: 620px; }
 .models-search-box > svg { color: var(--ink-3); }
 .models-search-box input:focus { box-shadow: none; }
+/* El anillo lo lleva la caja: el campo de dentro no dibuja otro */
+.models-search-box input:focus-visible { outline: none; }
 .models-results-label { color: var(--ink-2); font-size: 12px; margin: 12px 0; min-height: 18px; }
 .model-row { gap: 20px; padding: 18px; }
 .model-head { display: grid; grid-template-columns: 18px minmax(0, 1fr); min-width: 0; gap: 10px 14px; border-radius: 6px; }
