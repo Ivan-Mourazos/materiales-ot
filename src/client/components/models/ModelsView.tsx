@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ChevronDown, Layers, Loader2, Plus, RefreshCw, Search, X } from 'lucide-react';
-import type { AssignmentModel, ModelPart } from '../../types';
+import type { AssignmentModel, ModelPart, ModelSaveChange } from '../../types';
 import { groupModelsByCategory, listCategoryLabels } from '../../modelCategories';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { useVersionedSave } from '../common/useVersionedSave';
@@ -38,7 +38,7 @@ export function ModelsView({
     replaceExisting: boolean
   ) => void;
   /** Tras actualizar un modelo: si es el cargado en Asignaciones, App refresca su versión. */
-  onRecordSaved: (model: AssignmentModel) => void;
+  onRecordSaved: (model: AssignmentModel, change: ModelSaveChange) => void;
   pushToast: (text: string, type?: 'ok' | 'error' | 'warn' | 'info') => void;
 }) {
   const [models, setModels] = useState<AssignmentModel[]>([]);
@@ -156,7 +156,12 @@ export function ModelsView({
         body: { ...modelData },
         expectedUpdatedAt: modelToEdit?.updatedAt || modelToEdit?.createdAt
       });
-      if (!created) onRecordSaved(record);
+      if (!created) {
+        onRecordSaved(record, {
+          previousUpdatedAt: modelToEdit?.updatedAt || modelToEdit?.createdAt || '',
+          partsChanged: JSON.stringify(modelToEdit?.parts ?? []) !== JSON.stringify(record.parts)
+        });
+      }
       pushToast(created ? `Guardado como modelo nuevo: "${modelData.name} (copia)".` : 'Modelo actualizado correctamente.', 'ok');
     } else {
       const response = await fetch('/api/models', {

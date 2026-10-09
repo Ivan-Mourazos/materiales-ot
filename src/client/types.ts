@@ -161,6 +161,9 @@ export type AssignmentModel = {
   parts: ModelPart[];
 };
 
+/** Qué cambió al actualizar un modelo desde su pestaña: versión de partida y si cambiaron las partes. */
+export type ModelSaveChange = { previousUpdatedAt: string; partsChanged: boolean };
+
 /** Modelo del que vienen las OFs del formulario. `updatable` = se puede guardar encima sin destrozarlo. */
 export type ActiveModel = {
   id: string;

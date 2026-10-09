@@ -11,6 +11,7 @@ import type {
   ConnectionState,
   HistoryEntry,
   ModelPart,
+  ModelSaveChange,
   OfBlock,
   OrderDraft,
   PersistedState,
@@ -292,23 +293,28 @@ function App() {
 
   // Un borrador o modelo abierto aquí se ha guardado desde su pestaña. Sin esto, el siguiente
   // "Guardar cambios" usaría la versión vieja y avisaría de un conflicto que no existe.
-  // Solo cambian nombre, notas y versión: el contenido del formulario no se toca.
+  // Solo cambian los datos visibles y la versión: las OFs del formulario no se tocan.
   function handleDraftSaved(draft: OrderDraft) {
-    setActiveDraft((current) => (current?.id === draft.id ? toActiveDraft(draft) : current));
+    if (activeDraft?.id !== draft.id) return;
+    // El n.º de pedido vive en el formulario: si no se había tocado aquí, se sigue el nuevo
+    if (orderCode === (activeDraft.orderCode || '')) setOrderCode(draft.orderCode || '');
+    setActiveDraft(toActiveDraft(draft));
   }
 
-  function handleModelSaved(model: AssignmentModel) {
-    setActiveModel((current) =>
-      current?.id === model.id
-        ? {
-            ...current,
-            name: model.name,
-            description: model.description || '',
-            category: model.category || '',
-            updatedAt: model.updatedAt || model.createdAt
-          }
-        : current
-    );
+  function handleModelSaved(model: AssignmentModel, change: ModelSaveChange) {
+    setActiveModel((current) => {
+      if (current?.id !== model.id) return current;
+      // Si cambiaron las partes, el formulario tiene las viejas: se conserva la versión
+      // cargada para que guardar desde aquí avise del conflicto en vez de pisarlas
+      const sameContent = !change.partsChanged && change.previousUpdatedAt === current.updatedAt;
+      return {
+        ...current,
+        name: model.name,
+        description: model.description || '',
+        category: model.category || '',
+        updatedAt: sameContent ? model.updatedAt || model.createdAt : current.updatedAt
+      };
+    });
   }
 
   function handleTransferModelToAssignment(
