@@ -52,7 +52,9 @@ Se aplica en [models.js](../../../src/models.js) (hoy `Math.max(Number(q) || 1, 
 
 **Chapas.** Las tarjetas de modelo y de borrador, y el panel de resumen de la asignación, muestran "N sin cantidad" cuando N > 0. Nada si N = 0.
 
-**Bloqueo al generar.** Al pulsar "Generar asignación", si hay líneas sin cantidad, no se llama al servidor: se abre un aviso con la lista (OF, artículo) y un único botón para volver. El botón de generar no se desactiva antes —así el aviso dice qué falta en vez de un botón gris mudo.
+**Bloqueo al generar.** Al pulsar "Generar asignación", si hay líneas sin cantidad, no se llama al servidor: se abre un aviso con la lista (OF, artículo) y un botón para volver. El botón de generar no se desactiva antes —así el aviso dice qué falta en vez de un botón gris mudo.
+
+**Lista clicable.** Cada fila del aviso es un botón: al pulsarla se cierra el aviso, la tarjeta de esa OF se desplaza a la vista y el foco queda en el campo de cantidad de esa línea, listo para teclear. El campo se localiza por un `data-line-id` con el id de la línea en [MaterialTable.tsx](../../../src/client/components/assignments/MaterialTable.tsx). Va en un componente propio, `MissingQuantitiesDialog`, con el estilo de modal existente: `ConfirmDialog` lista textos, no acciones.
 
 **Defensa en el servidor.** [validation.js:30](../../../src/validation.js#L30) ya rechaza `<= 0`; se amplía a `null`/vacío con el mensaje "Falta la cantidad de {código} en la OF {of}." Cubre a cualquiera que llame a la API sin pasar por la pantalla.
 
@@ -100,6 +102,24 @@ La comparación va **dentro** de la cola de escritura, no antes: así dos petici
 
 No hay usuarios en la app, así que el aviso dice **cuándo** cambió, no **quién**.
 
+## 6. Instantáneas antes de cada guardado
+
+Las copias duplicadas del 720 hacían, sin querer, de historial. Al actualizar en el sitio la versión anterior se pierde, y `data/` no tiene copia de seguridad.
+
+**Ayudante compartido** `src/jsonStore.js`, que sustituye la lectura y escritura duplicadas hoy en `models.js` y `drafts.js`:
+
+- `readJsonArray(file, seed)` — lo que hacen hoy `readModels`/`readDrafts`: si no existe, crea el archivo con `seed`; si está corrupto o no es un array, lanza error **sin tocar el archivo** (comportamiento que ya cubre `tests/models.test.js`).
+- `writeJsonArray(file, data, { keep = 30 })` — antes de escribir, si el archivo existe, lo copia a `data/backups/<nombre>-<fecha>.json`; luego escribe con el patrón atómico actual (`.tmp` + `rename`); por último borra las instantáneas de ese nombre más allá de las 30 más recientes.
+
+Detalles:
+
+- Fecha en el nombre sin dos puntos, que Windows no admite: `models-2026-10-09T08-53-12-123Z.json`.
+- Si la instantánea falla (disco, permisos), **el guardado sigue** y se registra con `console.error`. Perder el trabajo del usuario por no poder hacer copia sería peor.
+- Si falla la poda, igual: se registra y sigue.
+- `data/` ya está en `.gitignore`, así que `data/backups/` también.
+- Solo modelos y borradores. El historial de reservas solo crece; no se sobrescribe.
+- **Restaurar es manual:** parar PM2, copiar la instantánea encima de `data/models.json` o `data/drafts.json`, arrancar. Se documenta en el README. Sin interfaz.
+
 ## Datos existentes
 
 - La línea `VESHFNEGR50MM = 0.000001` del modelo "Escenario Orquesta ODL 720 EE" pasa a `null`. Es la única por debajo de 0,00001 entre modelos y borradores (comprobado en producción el 2026-10-09).
@@ -111,6 +131,8 @@ No hay usuarios en la app, así que el aviso dice **cuándo** cambió, no **qui�
 - Saneado: vacío/`null`/`0` → `null`; `2.5` → `2.5`; negativo, `NaN` y texto → error.
 - `models.js` y `drafts.js` guardan y devuelven `null` sin convertirlo.
 - `validation.js` rechaza `null` y vacío con el mensaje nuevo; acepta cantidades válidas.
+- `jsonStore.js`: el primer guardado no deja instantánea (no hay versión anterior); el segundo sí, con el contenido previo; al pasar de 30 se borran las más antiguas y solo las de ese nombre; si la carpeta de instantáneas no se puede escribir, el guardado se completa igual.
+- Los tests actuales de `models.js` (archivo corrupto intacto, guardados simultáneos) siguen pasando sobre el ayudante nuevo.
 - Conflictos, en modelos y en borradores: `expectedUpdatedAt` igual → guarda; distinto → 409 y el archivo queda intacto; ausente → guarda. Dos `PUT` simultáneos con la misma fecha: uno guarda y el otro recibe 409.
 
 **Funcionales (servidor local, carpetas temporales, capturas por CDP):**
@@ -118,6 +140,7 @@ No hay usuarios en la app, así que el aviso dice **cuándo** cambió, no **qui�
 - Volcar ese modelo ×1 y ×3: la línea llega vacía en ambos.
 - Añadir un artículo sin cantidad desde Artículos y desde el buscador de la OF.
 - Generar con una línea vacía: aviso con la lista, **ningún archivo** en la carpeta temporal.
+- Pulsar una fila del aviso: se cierra, la OF queda a la vista y el foco en su campo de cantidad.
 - Rellenar la cantidad y generar: sale el `.xls`.
 - Usar modelo completo ×1 → "Actualizar" activo y el `PUT` no crea copia. Usar ×3 o parcial → desactivado con su motivo.
 - Dos pestañas con el mismo modelo: guardar en una, luego en la otra → aparece el aviso; probar las tres salidas.
@@ -127,4 +150,4 @@ No hay usuarios en la app, así que el aviso dice **cuándo** cambió, no **qui�
 
 - **Categorías por familia de producto en Modelos** (p. ej. "Escenarios"): spec propio, a continuación.
 - Avisar de cantidades sospechosamente bajas. Con `null` disponible, el `0,000001` deja de ser necesario.
-- Instantáneas automáticas de `data/` y lista de faltantes clicable: propuestas en la auditoría, descartadas por ahora.
+- Interfaz para restaurar instantáneas o comparar versiones: de momento basta con restaurar a mano.
