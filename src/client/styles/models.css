@@ -843,3 +843,62 @@ button, a, input, select { touch-action: manipulation; }
 @media (max-width: 760px) {
   .model-dialog .model-editor-fields.with-category { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Categorías: pastillas de filtro y grupos plegables */
+.category-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 0; }
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out);
+}
+.category-pill:hover { border-color: var(--border-strong); color: var(--ink); }
+.category-pill:focus-visible { outline: none; box-shadow: var(--ring); }
+.category-pill span { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.category-pill.active { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent-ink); }
+.category-pill.active span { color: inherit; }
+
+.model-groups { display: flex; flex-direction: column; gap: 20px; }
+.model-group-title { margin: 0 0 10px; font-size: inherit; font-weight: inherit; }
+.model-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: -6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.model-group-toggle:hover { background: var(--row-hover); }
+.model-group-toggle:focus-visible { outline: none; box-shadow: var(--ring); }
+.model-group-toggle svg { width: 16px; height: 16px; color: var(--ink-3); transition: transform .15s var(--ease-out); }
+.model-group-toggle[aria-expanded='false'] svg { transform: rotate(-90deg); }
+.model-group-count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.models-grid[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .category-pill, .model-group-toggle svg { transition: none; }
+}

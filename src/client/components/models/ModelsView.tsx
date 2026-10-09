@@ -1,12 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Layers, Loader2, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Layers, Loader2, Plus, RefreshCw, Search, X } from 'lucide-react';
 import type { AssignmentModel, ModelPart } from '../../types';
-import { listCategoryLabels } from '../../modelCategories';
+import { groupModelsByCategory, listCategoryLabels } from '../../modelCategories';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { useVersionedSave } from '../common/useVersionedSave';
 import { ModelCard } from './ModelCard';
 import { ModelEditorModal } from './ModelEditorModal';
 import { ModelTransferModal } from './ModelTransferModal';
+
+const VIEW_STORAGE_KEY = 'materiales-ot-modelos-vista';
+
+/** Pastilla elegida (null = Todas) y grupos plegados, por clave de categoría. */
+type LibraryView = { category: string | null; collapsed: string[] };
+
+function readLibraryView(): LibraryView {
+  try {
+    const saved = JSON.parse(localStorage.getItem(VIEW_STORAGE_KEY) || 'null');
+    return {
+      category: typeof saved?.category === 'string' ? saved.category : null,
+      collapsed: Array.isArray(saved?.collapsed)
+        ? saved.collapsed.filter((key: unknown): key is string => typeof key === 'string')
+        : []
+    };
+  } catch {
+    return { category: null, collapsed: [] };
+  }
+}
 
 export function ModelsView({
   onTransferModelToAssignment,
@@ -30,6 +49,15 @@ export function ModelsView({
   const [modelToTransfer, setModelToTransfer] = useState<AssignmentModel | null>(null);
   const [modelToDelete, setModelToDelete] = useState<{ id: string; name: string } | null>(null);
   const { saveVersioned, conflictDialog } = useVersionedSave();
+  const [view, setView] = useState<LibraryView>(readLibraryView);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(view));
+    } catch {
+      // Sin almacenamiento (modo privado, bloqueado): la vista no se recuerda
+    }
+  }, [view]);
 
   const fetchModels = useCallback(async () => {
     setIsLoading(true);
@@ -67,6 +95,52 @@ export function ModelsView({
     );
   }, [models, searchQuery]);
   const categorySuggestions = useMemo(() => listCategoryLabels(models), [models]);
+
+  // Las etiquetas salen de todos los modelos: buscar no debe cambiar cómo se llama un grupo
+  const allGroups = useMemo(() => groupModelsByCategory(models), [models]);
+  const hasCategories = allGroups.some((group) => group.key);
+  const searchedGroups = useMemo(() => {
+    const visible = new Set(filteredModels.map((m) => m.id));
+    return allGroups.map((group) => ({ ...group, models: group.models.filter((m) => visible.has(m.id)) }));
+  }, [allGroups, filteredModels]);
+  // Una pastilla guardada de una categoría que ya no existe vuelve a "Todas"
+  const selectedKey =
+    view.category !== null && allGroups.some((group) => group.key === view.category) ? view.category : null;
+  const shownGroups = searchedGroups.filter(
+    (group) => group.models.length > 0 && (selectedKey === null || group.key === selectedKey)
+  );
+  const shownCount = hasCategories
+    ? shownGroups.reduce((total, group) => total + group.models.length, 0)
+    : filteredModels.length;
+
+  function selectCategory(key: string | null) {
+    setView((current) => ({ ...current, category: key }));
+  }
+
+  function toggleGroup(key: string) {
+    setView((current) => ({
+      ...current,
+      collapsed: current.collapsed.includes(key)
+        ? current.collapsed.filter((k) => k !== key)
+        : [...current.collapsed, key]
+    }));
+  }
+
+  function renderModelCard(model: AssignmentModel) {
+    return (
+      <ModelCard
+        key={model.id}
+        model={model}
+        onUseModel={(m) => setModelToTransfer(m)}
+        onEditModel={(m) => {
+          setModelToEdit(m);
+          setEditorOpen(true);
+        }}
+        onDuplicateModel={handleDuplicateModel}
+        onDeleteModel={(id, name) => setModelToDelete({ id, name })}
+      />
+    );
+  }
 
   async function handleSaveModel(modelData: Partial<AssignmentModel>) {
     if (modelData.id) {
@@ -172,7 +246,31 @@ export function ModelsView({
         </button>
       </div>
 
-      <div className="models-results-label" role="status">{!isLoading && !loadError && `${filteredModels.length} ${filteredModels.length === 1 ? 'modelo disponible' : 'modelos disponibles'}${searchQuery ? ` para “${searchQuery}”` : ' · despliega un modelo para consultar sus materiales'}`}</div>
+      {!isLoading && !loadError && hasCategories && (
+        <div className="category-pills" role="group" aria-label="Filtrar por categoría">
+          <button
+            type="button"
+            className={`category-pill${selectedKey === null ? ' active' : ''}`}
+            aria-pressed={selectedKey === null}
+            onClick={() => selectCategory(null)}
+          >
+            Todas <span>{filteredModels.length}</span>
+          </button>
+          {searchedGroups.map((group) => (
+            <button
+              key={group.key || 'sin-categoria'}
+              type="button"
+              className={`category-pill${selectedKey === group.key ? ' active' : ''}`}
+              aria-pressed={selectedKey === group.key}
+              onClick={() => selectCategory(group.key)}
+            >
+              {group.label} <span>{group.models.length}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="models-results-label" role="status">{!isLoading && !loadError && `${shownCount} ${shownCount === 1 ? 'modelo disponible' : 'modelos disponibles'}${searchQuery ? ` para “${searchQuery}”` : ' · despliega un modelo para consultar sus materiales'}`}</div>
 
       {isLoading ? (
         <div className="history-empty">
@@ -186,7 +284,7 @@ export function ModelsView({
           <span>Comprueba la conexión y vuelve a intentarlo.</span>
           <button className="button button-muted" type="button" onClick={fetchModels}><RefreshCw aria-hidden="true" /> Reintentar</button>
         </div>
-      ) : filteredModels.length === 0 ? (
+      ) : shownCount === 0 ? (
         <div className="history-empty">
           <Layers aria-hidden="true" />
           <p>{searchQuery ? 'No se encontraron modelos para esa búsqueda.' : 'Aún no hay modelos creados.'}</p>
@@ -197,22 +295,35 @@ export function ModelsView({
           </span>
           {searchQuery && <button className="button button-muted" type="button" onClick={() => setSearchQuery('')}>Limpiar búsqueda</button>}
         </div>
-      ) : (
-        <div className="models-grid">
-          {filteredModels.map((model) => (
-            <ModelCard
-              key={model.id}
-              model={model}
-              onUseModel={(m) => setModelToTransfer(m)}
-              onEditModel={(m) => {
-                setModelToEdit(m);
-                setEditorOpen(true);
-              }}
-              onDuplicateModel={handleDuplicateModel}
-              onDeleteModel={(id, name) => setModelToDelete({ id, name })}
-            />
-          ))}
+      ) : hasCategories ? (
+        <div className="model-groups">
+          {shownGroups.map((group, index) => {
+            const collapsed = view.collapsed.includes(group.key);
+            const bodyId = `model-group-${index}`;
+            return (
+              <section key={group.key || 'sin-categoria'} className="model-group">
+                <h3 className="model-group-title">
+                  <button
+                    type="button"
+                    className="model-group-toggle"
+                    aria-expanded={!collapsed}
+                    aria-controls={bodyId}
+                    onClick={() => toggleGroup(group.key)}
+                  >
+                    <ChevronDown aria-hidden="true" />
+                    <span>{group.label}</span>
+                    <span className="model-group-count">{group.models.length}</span>
+                  </button>
+                </h3>
+                <div className="models-grid" id={bodyId} hidden={collapsed}>
+                  {group.models.map(renderModelCard)}
+                </div>
+              </section>
+            );
+          })}
         </div>
+      ) : (
+        <div className="models-grid">{filteredModels.map(renderModelCard)}</div>
       )}
 
       {editorOpen && (
