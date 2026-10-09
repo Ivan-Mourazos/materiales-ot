@@ -37,8 +37,8 @@ export function Header({
           type="button"
           className="cabecera-modo glass-chip"
           onClick={onToggleTheme}
-          aria-label="Cambiar tema"
-          title="Cambiar tema"
+          aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+          title={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
         >
           {theme === 'dark' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
         </button>

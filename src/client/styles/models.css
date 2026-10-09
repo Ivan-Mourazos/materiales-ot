@@ -850,10 +850,10 @@ button, a, input, select { touch-action: manipulation; }
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out);
+  transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out),
+    transform 140ms ease, box-shadow 140ms ease;
 }
 .category-pill:hover { border-color: var(--border-strong); color: var(--ink); }
-.category-pill:focus-visible { outline: none; box-shadow: var(--ring); }
 .category-pill span { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
 .category-pill.active { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent-ink); }
 .category-pill.active span { color: inherit; }

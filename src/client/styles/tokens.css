@@ -143,7 +143,6 @@
   --ink-3: var(--text-muted);
 
   --accent: var(--color-brand-400);
-  --accent-strong: var(--color-brand-300);
   --accent-soft: var(--active-bg);
   --accent-border: var(--control-active-border);
   /* El texto dorado de CoordinaOT: text-brand-800 (oscuro: brand-300) */

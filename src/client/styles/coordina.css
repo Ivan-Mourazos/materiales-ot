@@ -35,6 +35,8 @@
 .cabecera {
   align-items: center;
   display: flex;
+  /* En una ventana estrecha la derecha baja de línea en vez de desbordar */
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.625rem 1.25rem;
   position: sticky;
@@ -64,19 +66,36 @@
   gap: 6px;
 }
 
+/* Sombras propias de la tira (piezas.css, `.tira-3d > :not(.pestana-activa)`), no las de chip-3d */
 .tira-3d > :not(.pestana-activa) {
   background: var(--chip-bg);
   border: 1px solid var(--control-border);
-  box-shadow: var(--key-shadow);
+  box-shadow:
+    0 0 0 1px var(--edge),
+    0 1px 2px var(--contact),
+    inset 0 1px 0 color-mix(in srgb, var(--glass-highlight) 80%, white 20%),
+    0 2px 0 0 color-mix(in srgb, var(--border-strong) 80%, transparent),
+    0 6px 12px -6px var(--glass-shadow);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 .tira-3d > :not(.pestana-activa):hover {
   transform: translateY(-1px);
-  box-shadow: var(--key-shadow-hover);
+  box-shadow:
+    0 0 0 1px var(--edge),
+    0 2px 4px var(--contact),
+    inset 0 1px 0 color-mix(in srgb, var(--glass-highlight) 90%, white 10%),
+    0 3px 0 0 color-mix(in srgb, var(--border-strong) 90%, transparent),
+    0 10px 18px -6px var(--glass-shadow);
 }
 .tira-3d > :not(.pestana-activa):active {
   transform: translateY(1px);
-  box-shadow: var(--key-shadow-pressed);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+:root[data-theme='dark'] .tira-3d > :not(.pestana-activa) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 0 -1px rgba(0, 0, 0, 0.5),
+    0 6px 14px -8px rgba(0, 0, 0, 0.7);
 }
 
 .pestana {
@@ -178,10 +197,6 @@
 .estado-chip.error { color: var(--danger-ink); }
 .estado-chip.error .estado-punto { background: var(--danger-ink); }
 
-@media (prefers-reduced-motion: reduce) {
-  .glass-chip, .tira-3d > *, .pestana-activa { transition: none; transform: none; }
-}
-
 /* ── Paneles y tarjetas: `glass-panel rounded-xl` (globals.css 248-272; TecnicoCard.tsx 67),
    sin `backdrop-filter` (como `.panel-vidrio` de Planteamientos: sobre el fondo liso no hay
    nada que desenfocar, y un filtro haría de bloque contenedor de los desplegables fijos). ── */
@@ -198,9 +213,10 @@
   box-shadow: var(--panel-shadow);
 }
 
-/* Al pasar el ratón o abrir, CoordinaOT no cambia la sombra: solo el borde */
-.model-card:hover,
-.draft-card:hover,
+/* Al pasar el ratón o abrir, CoordinaOT no cambia la sombra: solo el borde. Sin pisar el
+   borde dorado de la tarjeta abierta ni del borrador en edición. */
+.model-card:not(.open):hover,
+.draft-card:not(.open):not(.active-working):hover,
 .history-card:hover {
   border-color: var(--border-strong);
   box-shadow: var(--panel-shadow);
