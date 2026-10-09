@@ -4,6 +4,7 @@ import '@fontsource-variable/inter';
 import './styles.css';
 
 import type {
+  ActiveDraft,
   ActiveModel,
   Article,
   AssignmentModel,
@@ -39,6 +40,7 @@ import { ArticleCatalog } from './components/catalog/ArticleCatalog';
 import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { MissingQuantitiesDialog } from './components/common/MissingQuantitiesDialog';
 import { ToastViewport } from './components/common/ToastViewport';
+import { SaveCancelledError, useVersionedSave } from './components/common/useVersionedSave';
 import { HistoryView } from './components/history/HistoryView';
 import { ModelsView } from './components/models/ModelsView';
 import { SaveAsModelModal } from './components/models/SaveAsModelModal';
@@ -55,6 +57,10 @@ function createOf(description = ''): OfBlock {
     description,
     materials: []
   };
+}
+
+function toActiveDraft(draft: OrderDraft): ActiveDraft {
+  return { id: draft.id, name: draft.name, notes: draft.notes, orderCode: draft.orderCode, updatedAt: draft.updatedAt };
 }
 
 function getInitialReservationState(): PersistedState {
@@ -142,7 +148,7 @@ function App() {
   const [modelModalOfs, setModelModalOfs] = useState<OfBlock[] | null>(null);
 
   // Borradores de pedidos
-  const [activeDraft, setActiveDraft] = useState<{ id: string; name: string; notes?: string; orderCode?: string } | null>(null);
+  const [activeDraft, setActiveDraft] = useState<ActiveDraft | null>(null);
   const [activeModel, setActiveModel] = useState<ActiveModel | null>(null);
   const [isSaveDraftOpen, setIsSaveDraftOpen] = useState(false);
   const [draftsVersion, setDraftsVersion] = useState(0);
@@ -152,6 +158,7 @@ function App() {
   const [, startTransition] = useTransition();
   const { mode: themeMode, setMode: setThemeMode } = useTheme();
   const { toasts, pushToast, dismissToast } = useToasts();
+  const { saveVersioned, conflictDialog } = useVersionedSave();
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({ orderCode, ofs }));
@@ -340,20 +347,21 @@ function App() {
     const fromForm = modelModalOfs === null;
 
     if (mode === 'update' && fromForm && activeModel?.updatable) {
-      const response = await fetch(`/api/models/${activeModel.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(modelData)
+      const { record, created } = await saveVersioned<AssignmentModel>({
+        kind: 'modelo',
+        collectionUrl: '/api/models',
+        responseKey: 'model',
+        id: activeModel.id,
+        name: modelData.name || activeModel.name,
+        body: { ...modelData },
+        expectedUpdatedAt: activeModel.updatedAt
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'No se pudo actualizar el modelo.');
-      setActiveModel({
-        ...activeModel,
-        name: data.model.name,
-        description: data.model.description || '',
-        updatedAt: data.model.updatedAt
-      });
-      pushToast(`Modelo "${data.model.name}" actualizado.`, 'ok');
+      setActiveModel(
+        created
+          ? describeActiveModel(record, { multiplier: 1, partsLoaded: record.parts.length, appendedToOtherOfs: false })
+          : { ...activeModel, name: record.name, description: record.description || '', updatedAt: record.updatedAt || activeModel.updatedAt }
+      );
+      pushToast(created ? `Guardado como modelo nuevo: "${record.name}".` : `Modelo "${record.name}" actualizado.`, 'ok');
       return;
     }
 
@@ -401,12 +409,7 @@ function App() {
 
     setOrderCode(draft.orderCode || '');
     setOfs(restoredOfs.length > 0 ? restoredOfs : [createOf()]);
-    setActiveDraft({
-      id: draft.id,
-      name: draft.name,
-      notes: draft.notes,
-      orderCode: draft.orderCode
-    });
+    setActiveDraft(toActiveDraft(draft));
     setActiveModel(null);
     setActiveTab('assignments');
     pushToast(`Borrador "${draft.name}" cargado. Puedes continuar editando el pedido.`, 'ok', {
@@ -427,23 +430,26 @@ function App() {
     }
 
     try {
-      const response = await fetch(`/api/drafts/${activeDraft.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: activeDraft.id,
-          name: activeDraft.name,
-          orderCode,
-          notes: activeDraft.notes,
-          ofs
-        })
+      const { record, created } = await saveVersioned<OrderDraft>({
+        kind: 'borrador',
+        collectionUrl: '/api/drafts',
+        responseKey: 'draft',
+        id: activeDraft.id,
+        name: activeDraft.name,
+        body: { id: activeDraft.id, name: activeDraft.name, orderCode, notes: activeDraft.notes, ofs },
+        expectedUpdatedAt: activeDraft.updatedAt
       });
-
-      if (!response.ok) throw new Error('No se pudo actualizar el borrador.');
+      setActiveDraft(toActiveDraft(record));
       setDraftsVersion((v) => v + 1);
-      pushToast(`Borrador "${activeDraft.name}" actualizado con éxito.`, 'ok');
+      pushToast(
+        created ? `Guardado como borrador nuevo: "${record.name}".` : `Borrador "${record.name}" actualizado con éxito.`,
+        'ok'
+      );
     } catch (err) {
-      pushToast(err instanceof Error ? err.message : 'Error al guardar el borrador.', 'error');
+      pushToast(
+        err instanceof Error ? err.message : 'Error al guardar el borrador.',
+        err instanceof SaveCancelledError ? 'warn' : 'error'
+      );
     }
   }
 
@@ -454,35 +460,36 @@ function App() {
     notes?: string;
     ofs: OfBlock[];
   }) {
-    const isUpdating = Boolean(data.id);
-    const url = isUpdating ? `/api/drafts/${data.id}` : '/api/drafts';
-    const method = isUpdating ? 'PUT' : 'POST';
+    let savedDraft: OrderDraft;
+    let updated = false;
 
-    const response = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || 'No se pudo guardar el borrador.');
+    if (data.id) {
+      const { record, created } = await saveVersioned<OrderDraft>({
+        kind: 'borrador',
+        collectionUrl: '/api/drafts',
+        responseKey: 'draft',
+        id: data.id,
+        name: data.name,
+        body: { ...data },
+        expectedUpdatedAt: activeDraft?.id === data.id ? activeDraft.updatedAt : undefined
+      });
+      savedDraft = record;
+      updated = !created;
+    } else {
+      const response = await fetch('/api/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const responseData = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(responseData.error || 'No se pudo guardar el borrador.');
+      savedDraft = responseData.draft;
     }
 
-    const savedData = await response.json();
-    const savedDraft = savedData.draft;
-
-    setActiveDraft({
-      id: savedDraft.id,
-      name: savedDraft.name,
-      notes: savedDraft.notes,
-      orderCode: savedDraft.orderCode
-    });
+    setActiveDraft(toActiveDraft(savedDraft));
     setDraftsVersion((v) => v + 1);
     pushToast(
-      isUpdating
-        ? `Borrador "${savedDraft.name}" actualizado con éxito.`
-        : `Borrador "${savedDraft.name}" guardado.`,
+      updated ? `Borrador "${savedDraft.name}" actualizado con éxito.` : `Borrador "${savedDraft.name}" guardado.`,
       'ok'
     );
   }
@@ -908,6 +915,7 @@ function App() {
         />
       )}
 
+      {conflictDialog}
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </main>
   );

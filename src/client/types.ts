@@ -77,7 +77,16 @@ export type OrderDraft = {
   sourceModelName?: string;
 };
 
-export type ToastType = 'ok' | 'error' | 'warn' | 'info';
+/** Borrador abierto en el formulario. `updatedAt` es la versión que se cargó. */
+export type ActiveDraft = {
+  id: string;
+  name: string;
+  notes?: string;
+  orderCode?: string;
+  updatedAt: string;
+};
+
+export type ToastType ='ok' | 'error' | 'warn' | 'info';
 
 export type ToastAction = {
   label: string;

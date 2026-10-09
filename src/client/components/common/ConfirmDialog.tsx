@@ -8,7 +8,10 @@ export function ConfirmDialog({
   items,
   confirmLabel,
   cancelLabel = 'Cancelar',
+  secondaryLabel,
+  initialFocus = 'confirm',
   onCancel,
+  onSecondary,
   onConfirm
 }: {
   title: string;
@@ -16,18 +19,25 @@ export function ConfirmDialog({
   items?: string[];
   confirmLabel: string;
   cancelLabel?: string;
+  secondaryLabel?: string;
+  /** Dónde cae el foco al abrir. En un conflicto, nunca en la acción que pisa trabajo ajeno. */
+  initialFocus?: 'confirm' | 'cancel';
   onCancel: () => void;
+  onSecondary?: () => void;
   onConfirm: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const confirmRef = useRef<HTMLButtonElement | null>(null);
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+  // Se lee una vez al montar; un ref evita reejecutar el efecto (y el aviso de dependencias)
+  const initialFocusRef = useRef(initialFocus);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement;
     if (!dialog) return;
     dialog.showModal();
-    confirmRef.current?.focus();
+    (initialFocusRef.current === 'cancel' ? cancelRef : confirmRef).current?.focus();
 
     return () => {
       if (dialog.open) dialog.close();
@@ -62,9 +72,14 @@ export function ConfirmDialog({
           </ul>
         )}
         <div className="modal-actions">
-          <button className="button button-muted" type="button" onClick={onCancel}>
+          <button className="button button-muted" type="button" ref={cancelRef} onClick={onCancel}>
             {cancelLabel}
           </button>
+          {secondaryLabel && onSecondary && (
+            <button className="button button-muted" type="button" onClick={onSecondary}>
+              {secondaryLabel}
+            </button>
+          )}
           <button className="button button-danger" type="button" ref={confirmRef} onClick={onConfirm}>
             {confirmLabel}
           </button>

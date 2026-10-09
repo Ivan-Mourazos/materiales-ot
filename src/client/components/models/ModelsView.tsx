@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Layers, Loader2, Plus, RefreshCw, Search, X } from 'lucide-react';
 import type { AssignmentModel, ModelPart } from '../../types';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { useVersionedSave } from '../common/useVersionedSave';
 import { ModelCard } from './ModelCard';
 import { ModelEditorModal } from './ModelEditorModal';
 import { ModelTransferModal } from './ModelTransferModal';
@@ -27,6 +28,7 @@ export function ModelsView({
   const [modelToEdit, setModelToEdit] = useState<AssignmentModel | null>(null);
   const [modelToTransfer, setModelToTransfer] = useState<AssignmentModel | null>(null);
   const [modelToDelete, setModelToDelete] = useState<{ id: string; name: string } | null>(null);
+  const { saveVersioned, conflictDialog } = useVersionedSave();
 
   const fetchModels = useCallback(async () => {
     setIsLoading(true);
@@ -65,22 +67,29 @@ export function ModelsView({
   }, [models, searchQuery]);
 
   async function handleSaveModel(modelData: Partial<AssignmentModel>) {
-    const isEditing = Boolean(modelData.id);
-    const url = isEditing ? `/api/models/${modelData.id}` : '/api/models';
-    const method = isEditing ? 'PUT' : 'POST';
-
-    const response = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(modelData)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'No se pudo guardar el modelo.');
+    if (modelData.id) {
+      const { created } = await saveVersioned<AssignmentModel>({
+        kind: 'modelo',
+        collectionUrl: '/api/models',
+        responseKey: 'model',
+        id: modelData.id,
+        name: modelData.name || '',
+        body: { ...modelData },
+        expectedUpdatedAt: modelToEdit?.updatedAt || modelToEdit?.createdAt
+      });
+      pushToast(created ? `Guardado como modelo nuevo: "${modelData.name} (copia)".` : 'Modelo actualizado correctamente.', 'ok');
+    } else {
+      const response = await fetch('/api/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(modelData)
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'No se pudo guardar el modelo.');
+      }
+      pushToast('Nuevo modelo creado con éxito.', 'ok');
     }
-
-    pushToast(isEditing ? 'Modelo actualizado correctamente.' : 'Nuevo modelo creado con éxito.', 'ok');
     fetchModels();
   }
 
@@ -240,6 +249,8 @@ export function ModelsView({
           }}
         />
       )}
+
+      {conflictDialog}
     </section>
   );
 }

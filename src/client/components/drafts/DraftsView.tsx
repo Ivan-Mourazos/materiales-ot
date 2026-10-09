@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import type { OfBlock, OrderDraft } from '../../types';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { useVersionedSave } from '../common/useVersionedSave';
 import { DraftCard } from './DraftCard';
 import { SaveDraftModal } from './SaveDraftModal';
 
@@ -34,6 +35,7 @@ export function DraftsView({
   const [searchQuery, setSearchQuery] = useState('');
   const [draftToDelete, setDraftToDelete] = useState<{ id: string; name: string } | null>(null);
   const [draftToEdit, setDraftToEdit] = useState<OrderDraft | null>(null);
+  const { saveVersioned, conflictDialog } = useVersionedSave();
 
   const fetchDrafts = useCallback(async () => {
     setIsLoading(true);
@@ -124,19 +126,32 @@ export function DraftsView({
     ofs: OfBlock[];
   }) {
     if (!draftToEdit?.id) return;
-    const response = await fetch(`/api/drafts/${draftToEdit.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...draftToEdit,
-        name: updatedData.name,
-        orderCode: updatedData.orderCode,
-        notes: updatedData.notes
-      })
-    });
+    const body = { ...draftToEdit, name: updatedData.name, orderCode: updatedData.orderCode, notes: updatedData.notes };
 
-    if (!response.ok) throw new Error('No se pudo actualizar el borrador.');
-    pushToast('Borrador actualizado.', 'ok');
+    if (!updatedData.id) {
+      // El usuario eligió "Guardar como copia nueva"
+      const copy: Record<string, unknown> = { ...body };
+      delete copy.id;
+      const response = await fetch('/api/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(copy)
+      });
+      if (!response.ok) throw new Error('No se pudo guardar la copia del borrador.');
+      pushToast(`Copia guardada como "${updatedData.name}".`, 'ok');
+    } else {
+      const { created } = await saveVersioned<OrderDraft>({
+        kind: 'borrador',
+        collectionUrl: '/api/drafts',
+        responseKey: 'draft',
+        id: draftToEdit.id,
+        name: updatedData.name,
+        body,
+        expectedUpdatedAt: draftToEdit.updatedAt
+      });
+      pushToast(created ? `Guardado como borrador nuevo: "${updatedData.name} (copia)".` : 'Borrador actualizado.', 'ok');
+    }
+
     setDraftToEdit(null);
     fetchDrafts();
   }
@@ -278,6 +293,8 @@ export function DraftsView({
           onSave={handleSaveEditedDraft}
         />
       )}
+
+      {conflictDialog}
     </section>
   );
 }
