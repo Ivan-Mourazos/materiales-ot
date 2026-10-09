@@ -242,6 +242,7 @@ function ArticleRow({
   onOpenStock: (article: Article) => void;
 }) {
   const [quantity, setQuantity] = useState('');
+  const [quantityBadInput, setQuantityBadInput] = useState(false);
   const writtenOfs = useMemo(
     () =>
       ofs.flatMap((ofBlock) => {
@@ -256,9 +257,10 @@ function ArticleRow({
   const ofTarget = isNewOf ? newOf : selectedOf;
 
   function commitCatalogLine() {
-    const added = onAddLineToOf(ofTarget, article, parseQuantityInput(quantity));
+    const added = onAddLineToOf(ofTarget, article, quantityBadInput ? 'invalid' : parseQuantityInput(quantity));
     if (added) {
       setQuantity('');
+      setQuantityBadInput(false);
       if (isNewOf) {
         setSelectedOf('');
         setNewOf('');
@@ -343,7 +345,10 @@ function ArticleRow({
             <span>Cant.</span>
             <input
               value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
+              onChange={(event) => {
+                setQuantity(event.currentTarget.value);
+                setQuantityBadInput(event.currentTarget.validity.badInput);
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();

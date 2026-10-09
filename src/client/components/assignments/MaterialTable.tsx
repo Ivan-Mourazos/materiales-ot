@@ -76,10 +76,19 @@ export function QuantityCell({
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const cancelledRef = useRef(false);
+  // En un input numérico, "-" o "1e" llegan como valor vacío pero con badInput:
+  // no son "sin cantidad", son texto a medio teclear y no deben borrar la cantidad.
+  const badInputRef = useRef(false);
 
   function commit() {
     if (cancelledRef.current) {
       cancelledRef.current = false;
+      badInputRef.current = false;
+      setDraft(null);
+      return;
+    }
+    if (badInputRef.current) {
+      badInputRef.current = false;
       setDraft(null);
       return;
     }
@@ -98,7 +107,10 @@ export function QuantityCell({
       data-line-id={line.id}
       value={draft ?? quantityInputValue(line.quantity)}
       placeholder="Sin cantidad"
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={(event) => {
+        badInputRef.current = event.currentTarget.validity.badInput;
+        setDraft(event.currentTarget.value);
+      }}
       onFocus={(event) => event.target.select()}
       onBlur={commit}
       onKeyDown={(event) => {

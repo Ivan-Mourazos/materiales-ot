@@ -28,6 +28,7 @@ export function OfCard({
   onUpdateLineQuantity: (ofId: string, lineId: string, quantity: Quantity) => void;
 }) {
   const [quantity, setQuantity] = useState('');
+  const [quantityBadInput, setQuantityBadInput] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const pickerRef = useRef<ArticlePickerHandle>(null);
 
@@ -39,10 +40,11 @@ export function OfCard({
         code: '',
         description: ''
       };
-    const added = onAddLine(ofBlock.id, article, parseQuantityInput(quantity));
+    const added = onAddLine(ofBlock.id, article, quantityBadInput ? 'invalid' : parseQuantityInput(quantity));
     if (!added) return;
     setSelectedArticle(null);
     setQuantity('');
+    setQuantityBadInput(false);
     pickerRef.current?.clear();
   }
 
@@ -92,7 +94,10 @@ export function OfCard({
           <span>Cantidad</span>
           <input
             value={quantity}
-            onChange={(event) => setQuantity(event.target.value)}
+            onChange={(event) => {
+              setQuantity(event.currentTarget.value);
+              setQuantityBadInput(event.currentTarget.validity.badInput);
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();

@@ -150,5 +150,5 @@ Para volver a una versión anterior:
 ```bash
 pm2 stop materiales-ot
 cp data/backups/models-<fecha>.json data/models.json   # o drafts-<fecha>.json → data/drafts.json
-pm2 start materiales-ot
+pm2 restart materiales-ot
 ```

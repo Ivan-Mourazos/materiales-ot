@@ -8,7 +8,8 @@ const reserva = (materials) => ({
 });
 
 test('una línea sin cantidad bloquea la reserva con un 400 que nombra artículo y OF', () => {
-  for (const quantity of [null, undefined, '', '   ', 0, '0']) {
+  // 0.0000004 redondea a 0: tampoco es una cantidad
+  for (const quantity of [null, undefined, '', '   ', 0, '0', 0.0000004, '0.0000004']) {
     assert.throws(
       () => normalizeReservation(reserva([{ code: 'ACRILI2170P120', description: 'Lona', quantity }])),
       (error) => error.statusCode === 400

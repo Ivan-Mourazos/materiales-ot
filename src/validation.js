@@ -36,10 +36,14 @@ export function normalizeReservation(payload) {
           throw validationError(`La cantidad de ${code} en la OF ${of} no es válida.`);
         }
 
+        // Una cantidad minúscula que al redondear queda en 0 equivale a no tener cantidad
+        const rounded = roundQuantity(quantity);
+        if (rounded <= 0) throw validationError(`Falta la cantidad de ${code} en la OF ${of}.`);
+
         return [{
           code,
           description,
-          quantity: roundQuantity(quantity)
+          quantity: rounded
         }];
       });
 
