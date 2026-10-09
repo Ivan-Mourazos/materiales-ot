@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertExpectedVersion, nextVersion, readJsonArray, writeJsonArray } from './jsonStore.js';
+import { normalizeStoredQuantity } from './quantity.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(__dirname, '..', 'data');
-const modelsFile = path.join(dataDir, 'models.json');
+const modelsFile = path.join(__dirname, '..', 'data', 'models.json');
 
 // Serializa las escrituras para evitar colisiones entre peticiones simultáneas
 let writeQueue = Promise.resolve();
@@ -15,12 +15,12 @@ let writeQueue = Promise.resolve();
 const initialSeedModels = [];
 
 export async function listModels() {
-  const models = await readModels();
+  const models = await readJsonArray(modelsFile, initialSeedModels);
   return models.sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
 }
 
 export async function getModelById(id) {
-  const models = await readModels();
+  const models = await readJsonArray(modelsFile, initialSeedModels);
   return models.find((m) => m.id === id) || null;
 }
 
@@ -30,34 +30,39 @@ export function saveModel(modelData) {
   writeQueue = writeQueue
     .catch(() => {})
     .then(async () => {
-      const models = await readModels();
-      const now = new Date().toISOString();
-      const existingIndex = models.findIndex((m) => m.id === modelData.id);
+      const models = await readJsonArray(modelsFile, initialSeedModels);
+      const existingIndex = modelData.id ? models.findIndex((m) => m.id === modelData.id) : -1;
+      const parts = sanitizeParts(modelData.parts);
 
       if (existingIndex >= 0) {
+        const current = models[existingIndex];
+        // Dentro de la cola: dos peticiones simultáneas no pueden pasar las dos la comprobación
+        assertExpectedVersion(current, modelData.expectedUpdatedAt, 'modelo');
         resultModel = {
-          ...models[existingIndex],
-          ...modelData,
-          updatedAt: now,
-          parts: sanitizeParts(modelData.parts)
+          ...current,
+          name: String(modelData.name || '').trim() || current.name,
+          description: String(modelData.description ?? current.description ?? '').trim(),
+          parts,
+          updatedAt: nextVersion(current.updatedAt || current.createdAt)
         };
         models[existingIndex] = resultModel;
       } else {
+        const now = new Date().toISOString();
         resultModel = {
           id: modelData.id || randomUUID(),
           name: String(modelData.name || '').trim() || 'Nuevo Modelo',
           description: String(modelData.description || '').trim(),
           createdAt: now,
           updatedAt: now,
-          parts: sanitizeParts(modelData.parts)
+          parts
         };
         models.unshift(resultModel);
       }
 
-      await writeModels(models);
+      await writeJsonArray(modelsFile, models);
     })
     .catch((error) => {
-      console.error('Error al guardar modelo:', error);
+      if (!error.statusCode) console.error('Error al guardar modelo:', error);
       throw error;
     });
 
@@ -68,9 +73,8 @@ export function deleteModel(id) {
   writeQueue = writeQueue
     .catch(() => {})
     .then(async () => {
-      const models = await readModels();
-      const nextModels = models.filter((m) => m.id !== id);
-      await writeModels(nextModels);
+      const models = await readJsonArray(modelsFile, initialSeedModels);
+      await writeJsonArray(modelsFile, models.filter((m) => m.id !== id));
     })
     .catch((error) => {
       console.error('Error al eliminar modelo:', error);
@@ -82,44 +86,25 @@ export function deleteModel(id) {
 
 function sanitizeParts(parts) {
   if (!Array.isArray(parts)) return [];
-  return parts.map((part, index) => ({
-    id: part.id || randomUUID(),
-    name: String(part.name || `Parte ${index + 1}`).trim(),
-    description: String(part.description || '').trim(),
-    materials: Array.isArray(part.materials)
-      ? part.materials.map((m) => ({
-        id: m.id || randomUUID(),
-        code: String(m.code || '').trim().toUpperCase(),
-        description: String(m.description || '').trim(),
-        quantity: Math.max(Number(m.quantity) || 1, 0.000001),
-        width: m.width ?? null,
-        widthWarning: m.widthWarning ?? null
-      }))
-      : []
-  }));
-}
-
-async function readModels() {
-  try {
-    const raw = await fs.readFile(modelsFile, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
-    throw new Error('El archivo de modelos no contiene una biblioteca válida.');
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
-    }
-  }
-
-  // Si no existe, crear el archivo con los modelos iniciales
-  await fs.mkdir(dataDir, { recursive: true });
-  await writeModels(initialSeedModels);
-  return structuredClone(initialSeedModels);
-}
-
-async function writeModels(models) {
-  await fs.mkdir(dataDir, { recursive: true });
-  const tmpPath = `${modelsFile}.tmp-${process.pid}-${Date.now()}`;
-  await fs.writeFile(tmpPath, JSON.stringify(models, null, 2), 'utf8');
-  await fs.rename(tmpPath, modelsFile);
+  return parts.map((part, index) => {
+    const name = String(part.name || `Parte ${index + 1}`).trim();
+    return {
+      id: part.id || randomUUID(),
+      name,
+      description: String(part.description || '').trim(),
+      materials: Array.isArray(part.materials)
+        ? part.materials.map((m) => {
+          const code = String(m.code || '').trim().toUpperCase();
+          return {
+            id: m.id || randomUUID(),
+            code,
+            description: String(m.description || '').trim(),
+            quantity: normalizeStoredQuantity(m.quantity, `${code || 'una línea'} de «${name}»`),
+            width: m.width ?? null,
+            widthWarning: m.widthWarning ?? null
+          };
+        })
+        : []
+    };
+  });
 }

@@ -1,23 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { isolatedServer } from './helpers/isolated-server.js';
 
 async function isolatedDrafts(t) {
-  const directory = await mkdtemp(path.join(tmpdir(), 'materiales-drafts-test-'));
-  await mkdir(path.join(directory, 'src'));
-  const moduleFile = path.join(directory, 'src', 'drafts.mjs');
-  await copyFile(new URL('../src/drafts.js', import.meta.url), moduleFile);
-  t.after(async () => {
-    assert.ok(path.resolve(directory).startsWith(path.resolve(tmpdir()) + path.sep));
-    await rm(directory, { recursive: true, force: true });
-  });
-  return {
-    api: await import(pathToFileURL(moduleFile).href),
-    file: path.join(directory, 'data', 'drafts.json')
-  };
+  const { importModule, dataFile } = await isolatedServer(t);
+  return { api: await importModule('drafts.js'), file: dataFile('drafts.json') };
 }
 
 test('drafts CRUD operations and totals calculation', async (t) => {
