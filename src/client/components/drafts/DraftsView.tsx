@@ -137,7 +137,10 @@ export function DraftsView({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(copy)
       });
-      if (!response.ok) throw new Error('No se pudo guardar la copia del borrador.');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'No se pudo guardar la copia del borrador.');
+      }
       pushToast(`Copia guardada como "${updatedData.name}".`, 'ok');
     } else {
       const { created } = await saveVersioned<OrderDraft>({

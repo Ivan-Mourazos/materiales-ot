@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { historyDateFormat } from '../../utils';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -47,7 +47,11 @@ export function useVersionedSave(): {
 } {
   const [pending, setPending] = useState<PendingConflict | null>(null);
 
-  const saveVersioned = useCallback(async <T extends VersionedRecord>(
+  // Hay un guardado en curso (o un conflicto esperando respuesta): un segundo guardado
+  // con la misma versión chocaría consigo mismo y mostraría un conflicto falso
+  const busyRef = useRef(false);
+
+  const execute = useCallback(async <T extends VersionedRecord>(
     options: VersionedSaveOptions
   ): Promise<{ record: T; created: boolean }> => {
     const { kind, collectionUrl, responseKey, id, name, body, expectedUpdatedAt } = options;
@@ -59,7 +63,7 @@ export function useVersionedSave(): {
     if (first.response.status !== 409) throw failure(first.data);
 
     const resolution = await new Promise<Resolution>((resolve) => {
-      setPending({ kind, name, changedAt: first.data.current?.updatedAt ?? null, resolve });
+      setPending({ kind, name, changedAt: first.data.current?.updatedAt ?? first.data.current?.createdAt ?? null, resolve });
     });
     setPending(null);
 
@@ -80,6 +84,18 @@ export function useVersionedSave(): {
     if (!copy.response.ok) throw failure(copy.data);
     return { record: copy.data[responseKey] as T, created: true };
   }, []);
+
+  const saveVersioned = useCallback(async <T extends VersionedRecord>(
+    options: VersionedSaveOptions
+  ): Promise<{ record: T; created: boolean }> => {
+    if (busyRef.current) throw new SaveCancelledError('Ya se está guardando; espera a que termine.');
+    busyRef.current = true;
+    try {
+      return await execute<T>(options);
+    } finally {
+      busyRef.current = false;
+    }
+  }, [execute]);
 
   const conflictDialog = pending ? (
     <ConfirmDialog

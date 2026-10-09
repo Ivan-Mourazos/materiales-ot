@@ -151,6 +151,7 @@ function App() {
   const [activeDraft, setActiveDraft] = useState<ActiveDraft | null>(null);
   const [activeModel, setActiveModel] = useState<ActiveModel | null>(null);
   const [isSaveDraftOpen, setIsSaveDraftOpen] = useState(false);
+  const [isQuickSavingDraft, setIsQuickSavingDraft] = useState(false);
   const [draftsVersion, setDraftsVersion] = useState(0);
   const [draftsCount, setDraftsCount] = useState(0);
   const [pendingDraftToResume, setPendingDraftToResume] = useState<OrderDraft | null>(null);
@@ -428,7 +429,9 @@ function App() {
       setIsSaveDraftOpen(true);
       return;
     }
+    if (isQuickSavingDraft) return;
 
+    setIsQuickSavingDraft(true);
     try {
       const { record, created } = await saveVersioned<OrderDraft>({
         kind: 'borrador',
@@ -450,6 +453,8 @@ function App() {
         err instanceof Error ? err.message : 'Error al guardar el borrador.',
         err instanceof SaveCancelledError ? 'warn' : 'error'
       );
+    } finally {
+      setIsQuickSavingDraft(false);
     }
   }
 
@@ -800,6 +805,7 @@ function App() {
           onSave={() => saveExcelToNetwork()}
           onOpenSaveDraft={() => setIsSaveDraftOpen(true)}
           onQuickSaveDraft={handleQuickSaveDraft}
+          isQuickSavingDraft={isQuickSavingDraft}
           onClearActiveDraft={clearActiveDraft}
           onAddOf={addOf}
           onOpenLoadModel={() => setActiveTab('models')}

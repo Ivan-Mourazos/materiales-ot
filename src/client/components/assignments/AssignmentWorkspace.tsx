@@ -15,6 +15,7 @@ export function AssignmentWorkspace({
   onSave,
   onOpenSaveDraft,
   onQuickSaveDraft,
+  isQuickSavingDraft = false,
   onClearActiveDraft,
   onAddOf,
   onOpenLoadModel,
@@ -37,6 +38,7 @@ export function AssignmentWorkspace({
   onSave: () => void;
   onOpenSaveDraft: () => void;
   onQuickSaveDraft?: () => void;
+  isQuickSavingDraft?: boolean;
   onClearActiveDraft?: () => void;
   onAddOf: () => void;
   onOpenLoadModel: () => void;
@@ -80,10 +82,11 @@ export function AssignmentWorkspace({
                   className="button button-primary"
                   type="button"
                   onClick={onQuickSaveDraft}
+                  disabled={isQuickSavingDraft}
                   title="Guardar los cambios actuales en este borrador"
                 >
                   <Save size={14} aria-hidden="true" />
-                  Guardar cambios
+                  {isQuickSavingDraft ? 'Guardando…' : 'Guardar cambios'}
                 </button>
               )}
               <button

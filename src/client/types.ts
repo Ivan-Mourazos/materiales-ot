@@ -86,7 +86,7 @@ export type ActiveDraft = {
   updatedAt: string;
 };
 
-export type ToastType ='ok' | 'error' | 'warn' | 'info';
+export type ToastType = 'ok' | 'error' | 'warn' | 'info';
 
 export type ToastAction = {
   label: string;
