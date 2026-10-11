@@ -11,6 +11,7 @@ async function isolatedLibrary(t) {
 
 test('unreadable or malformed library is preserved and writes recover after repair', async (t) => {
   const { api, file } = await isolatedLibrary(t);
+  const errores = t.mock.method(console, 'error', () => {});
   await api.saveModel({ name: 'Modelo conservado', parts: [] });
   const original = await readFile(file, 'utf8');
 
@@ -27,6 +28,41 @@ test('unreadable or malformed library is preserved and writes recover after repa
     await api.deleteModel(saved.id);
     assert.ok(!(await api.listModels()).some((model) => model.id === saved.id));
   }
+  assert.equal(errores.mock.callCount(), 4);
+});
+
+test('actualizar un modelo borrado da 404 sin escribir y crear con id sigue permitido', async (t) => {
+  const { api, file } = await isolatedLibrary(t);
+  const saved = await api.saveModel({ name: 'Original', parts: [] });
+  await api.deleteModel(saved.id);
+  const antes = await readFile(file, 'utf8');
+
+  await assert.rejects(
+    api.saveModel({ ...saved, name: 'Actualizado', expectedUpdatedAt: saved.updatedAt }, { mustExist: true }),
+    (error) => error.statusCode === 404 && error.message === 'Este modelo ya no existe: lo ha borrado otra persona.'
+  );
+  assert.equal(await readFile(file, 'utf8'), antes);
+  assert.equal(await api.getModelById(saved.id), null);
+  assert.deepEqual(await api.listModels(), []);
+
+  const creado = await api.saveModel({ ...saved, name: 'Recreado' });
+  assert.equal(creado.id, saved.id);
+  assert.equal((await api.getModelById(saved.id)).name, 'Recreado');
+  const actualizado = await api.saveModel({ ...creado, name: 'Existe', expectedUpdatedAt: creado.updatedAt }, { mustExist: true });
+  assert.equal(actualizado.name, 'Existe');
+});
+
+test('mustExist comprueba el modelo dentro de la cola después de un borrado pendiente', async (t) => {
+  const { api } = await isolatedLibrary(t);
+  const saved = await api.saveModel({ name: 'M', parts: [] });
+  const borrado = api.deleteModel(saved.id);
+  const actualizado = api.saveModel(saved, { mustExist: true });
+  await Promise.all([
+    borrado,
+    assert.rejects(actualizado, (error) => error.statusCode === 404
+      && error.message === 'Este modelo ya no existe: lo ha borrado otra persona.')
+  ]);
+  assert.deepEqual(await api.listModels(), []);
 });
 
 test('simultaneous saves preserve every model', async (t) => {

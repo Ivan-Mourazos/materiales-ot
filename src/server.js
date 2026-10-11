@@ -101,7 +101,7 @@ app.put('/api/models/:id', async (req, res, next) => {
       res.status(400).json({ error: 'El nombre del modelo es obligatorio.' });
       return;
     }
-    const saved = await saveModel({ ...req.body, id: req.params.id });
+    const saved = await saveModel({ ...req.body, id: req.params.id }, { mustExist: true });
     res.json({ ok: true, model: saved });
   } catch (error) {
     next(error);
@@ -150,7 +150,7 @@ app.post('/api/drafts', async (req, res, next) => {
 
 app.put('/api/drafts/:id', async (req, res, next) => {
   try {
-    const saved = await saveDraft({ ...req.body, id: req.params.id });
+    const saved = await saveDraft({ ...req.body, id: req.params.id }, { mustExist: true });
     res.json({ ok: true, draft: saved });
   } catch (error) {
     next(error);

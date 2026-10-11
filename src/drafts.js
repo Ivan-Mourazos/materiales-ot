@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { httpError } from './httpError.js';
 import { assertExpectedVersion, nextVersion, readJsonArray, writeJsonArray } from './jsonStore.js';
 import { normalizeStoredQuantity } from './quantity.js';
 
@@ -20,7 +21,7 @@ export async function getDraftById(id) {
   return drafts.find((d) => d.id === id) || null;
 }
 
-export function saveDraft(draftData) {
+export function saveDraft(draftData, { mustExist = false } = {}) {
   let resultDraft = null;
 
   writeQueue = writeQueue
@@ -28,6 +29,9 @@ export function saveDraft(draftData) {
     .then(async () => {
       const drafts = await readJsonArray(draftsFile);
       const existingIndex = draftData.id ? drafts.findIndex((d) => d.id === draftData.id) : -1;
+      if (mustExist && existingIndex < 0) {
+        throw httpError(404, 'Este borrador ya no existe: lo ha borrado otra persona.');
+      }
       const sanitizedOfs = sanitizeOfs(draftData.ofs);
       const totals = calculateTotals(sanitizedOfs);
 

@@ -8,6 +8,40 @@ async function isolatedDrafts(t) {
   return { api: await importModule('drafts.js'), file: dataFile('drafts.json') };
 }
 
+test('actualizar un borrador borrado da 404 sin escribir y crear con id sigue permitido', async (t) => {
+  const { api, file } = await isolatedDrafts(t);
+  const saved = await api.saveDraft({ name: 'Original', ofs: [] });
+  await api.deleteDraft(saved.id);
+  const antes = await readFile(file, 'utf8');
+
+  await assert.rejects(
+    api.saveDraft({ ...saved, name: 'Actualizado', expectedUpdatedAt: saved.updatedAt }, { mustExist: true }),
+    (error) => error.statusCode === 404 && error.message === 'Este borrador ya no existe: lo ha borrado otra persona.'
+  );
+  assert.equal(await readFile(file, 'utf8'), antes);
+  assert.equal(await api.getDraftById(saved.id), null);
+  assert.deepEqual(await api.listDrafts(), []);
+
+  const creado = await api.saveDraft({ ...saved, name: 'Recreado' });
+  assert.equal(creado.id, saved.id);
+  assert.equal((await api.getDraftById(saved.id)).name, 'Recreado');
+  const actualizado = await api.saveDraft({ ...creado, name: 'Existe', expectedUpdatedAt: creado.updatedAt }, { mustExist: true });
+  assert.equal(actualizado.name, 'Existe');
+});
+
+test('mustExist comprueba el borrador dentro de la cola después de un borrado pendiente', async (t) => {
+  const { api } = await isolatedDrafts(t);
+  const saved = await api.saveDraft({ name: 'D', ofs: [] });
+  const borrado = api.deleteDraft(saved.id);
+  const actualizado = api.saveDraft(saved, { mustExist: true });
+  await Promise.all([
+    borrado,
+    assert.rejects(actualizado, (error) => error.statusCode === 404
+      && error.message === 'Este borrador ya no existe: lo ha borrado otra persona.')
+  ]);
+  assert.deepEqual(await api.listDrafts(), []);
+});
+
 test('drafts CRUD operations and totals calculation', async (t) => {
   const { api } = await isolatedDrafts(t);
 

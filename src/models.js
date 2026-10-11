@@ -42,7 +42,7 @@ export async function getModelById(id) {
   return models.find((m) => m.id === id) || null;
 }
 
-export function saveModel(modelData) {
+export function saveModel(modelData, { mustExist = false } = {}) {
   let resultModel = null;
 
   writeQueue = writeQueue
@@ -50,6 +50,9 @@ export function saveModel(modelData) {
     .then(async () => {
       const models = await readJsonArray(modelsFile, initialSeedModels);
       const existingIndex = modelData.id ? models.findIndex((m) => m.id === modelData.id) : -1;
+      if (mustExist && existingIndex < 0) {
+        throw httpError(404, 'Este modelo ya no existe: lo ha borrado otra persona.');
+      }
       const parts = sanitizeParts(modelData.parts);
 
       if (existingIndex >= 0) {
