@@ -190,6 +190,39 @@ test('una categoría que no es texto da 400 y no guarda nada', async (t) => {
   assert.equal((await api.listModels()).length, 0);
 });
 
+test('una categoría que no es texto al actualizar da 400 y conserva el modelo y su versión', async (t) => {
+  const { api, file } = await isolatedLibrary(t);
+  const saved = await api.saveModel({ name: 'Original', category: 'Escenarios', parts: [] });
+  const antes = await readFile(file, 'utf8');
+
+  await assert.rejects(
+    api.saveModel({ id: saved.id, category: 42, expectedUpdatedAt: saved.updatedAt }),
+    (error) => error.statusCode === 400 && error.message === 'Categoría no válida.'
+  );
+
+  const leido = await api.getModelById(saved.id);
+  assert.equal(leido.category, saved.category);
+  assert.equal(leido.updatedAt, saved.updatedAt);
+  assert.deepEqual(leido, saved);
+  assert.equal(await readFile(file, 'utf8'), antes);
+});
+
+test('el recorte de categoría conserva un emoji en la posición 40 y quita el espacio final', async (t) => {
+  const { api } = await isolatedLibrary(t);
+  const prefijo = 'x'.repeat(39);
+  const emoji = '😀';
+  assert.equal(emoji.length, 2);
+
+  const conEmoji = await api.saveModel({ name: 'Emoji', category: `${prefijo}${emoji}más texto`, parts: [] });
+  assert.equal(conEmoji.category, prefijo + emoji);
+  assert.equal(Array.from(conEmoji.category).length, 40);
+  assert.equal((await api.getModelById(conEmoji.id)).category, prefijo + emoji);
+
+  const conEspacio = await api.saveModel({ name: 'Espacio', category: `${prefijo} más texto`, parts: [] });
+  assert.equal(conEspacio.category, prefijo);
+  assert.equal((await api.getModelById(conEspacio.id)).category, prefijo);
+});
+
 test('al actualizar, sin el campo se conserva y con "" o null se quita', async (t) => {
   const { api } = await isolatedLibrary(t);
   let modelo = await api.saveModel({ name: 'E', category: 'Escenarios', parts: [] });
