@@ -379,8 +379,8 @@ app.use((error, _req, res, _next) => {
   }
 
   res.status(status).json({
-    error: status === 500 && !error.statusCode ? 'No se pudo completar la operación.' : error.message,
-    ...(error.payload || {})
+    ...(error.payload || {}),
+    error: status === 500 && !error.statusCode ? 'No se pudo completar la operación.' : error.message
   });
 });
 
