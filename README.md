@@ -91,6 +91,7 @@ Con esto PM2 relanzará `materiales-ot` automáticamente si el servidor se reini
 ### 7. Actualizar la aplicación
 
 ```bash
+cd /webs/materiales-ot
 git pull
 pnpm install --frozen-lockfile
 pnpm build
