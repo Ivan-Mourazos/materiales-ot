@@ -22,7 +22,12 @@ test('si no existe, se crea con la semilla; si está corrupto, se lanza error si
 
   for (const roto of ['{incompleto', '{"no":"es una lista"}']) {
     await writeFile(file, roto);
-    await assert.rejects(readJsonArray(file));
+    await assert.rejects(
+      readJsonArray(file),
+      (error) => roto === '{incompleto'
+        ? error instanceof SyntaxError
+        : error.message === 'models.json no contiene una lista válida.'
+    );
     assert.equal(await readFile(file, 'utf8'), roto);
   }
 });
@@ -75,8 +80,58 @@ test('escrituras simultáneas al mismo archivo no chocan', async (t) => {
   const file = path.join(directory, 'models.json');
   await assert.doesNotReject(Promise.all(Array.from({ length: 20 }, (_, v) => writeJsonArray(file, [{ v }]))));
 
-  const [final] = JSON.parse(await readFile(file, 'utf8'));
-  assert.equal(final.v >= 0 && final.v <= 19, true);
+  const final = JSON.parse(await readFile(file, 'utf8'));
+  assert.deepEqual(final, [{ v: 19 }]);
+});
+
+test('una escritura fallida no rompe la siguiente ya encolada al mismo archivo', async (t) => {
+  const directory = await carpetaTemporal(t);
+  const file = path.join(directory, 'models.json');
+  await writeJsonArray(file, [{ v: 0 }]);
+  const circular = {};
+  circular.self = circular;
+
+  const fallida = writeJsonArray(file, [circular]);
+  const siguiente = writeJsonArray(file, [{ v: 2 }]);
+  await Promise.all([
+    assert.rejects(fallida, (error) => error instanceof TypeError && /circular/i.test(error.message)),
+    siguiente
+  ]);
+
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), [{ v: 2 }]);
+  assert.equal((await readdir(directory)).some((name) => name.includes('.tmp-')), false);
+});
+
+test('keep elimina exactamente las instantáneas más antiguas por su fecha', async (t) => {
+  const directory = await carpetaTemporal(t);
+  const file = path.join(directory, 'models.json');
+  const backups = path.join(directory, 'backups');
+  await writeJsonArray(file, [{ v: 4 }]);
+  await mkdir(backups);
+  const nombres = [1, 2, 3, 4].map((dia) => `models-2020-01-0${dia}T00-00-00-000Z-000000.json`);
+  // Orden de creación distinto del cronológico: la poda debe usar las fechas.
+  for (const index of [3, 0, 2, 1]) {
+    await writeFile(path.join(backups, nombres[index]), JSON.stringify([{ v: index }]));
+  }
+  const ajena = 'drafts-2020-01-01T00-00-00-000Z-000000.json';
+  const manual = 'models-manual.json';
+  for (const name of [ajena, manual]) await writeFile(path.join(backups, name), 'conservar');
+
+  await writeJsonArray(file, [{ v: 5 }], { keep: 3 });
+
+  const quedan = await instantaneas(directory);
+  const nueva = quedan.filter((name) => name !== manual && !nombres.includes(name));
+  assert.equal(nueva.length, 1);
+  assert.deepEqual(quedan, [nombres[2], nombres[3], manual, nueva[0]].sort());
+  for (const name of nombres.slice(0, 2)) {
+    await assert.rejects(readFile(path.join(backups, name)), { code: 'ENOENT' });
+  }
+  const propias = quedan.filter((name) => name !== manual);
+  assert.equal(propias.length, 3);
+  const contenidos = await Promise.all(propias.map(async (name) =>
+    JSON.parse(await readFile(path.join(backups, name), 'utf8'))));
+  assert.deepEqual(contenidos, [[{ v: 2 }], [{ v: 3 }], [{ v: 4 }]]);
+  for (const name of [ajena, manual]) assert.equal(await readFile(path.join(backups, name), 'utf8'), 'conservar');
 });
 
 test('si la escritura falla no queda ningún .tmp', async (t) => {
