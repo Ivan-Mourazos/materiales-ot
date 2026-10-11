@@ -11,11 +11,15 @@ export function normalizeStoredQuantity(value, context = '') {
 
   const text = typeof value === 'string' ? value.trim().replace(',', '.') : value;
   if (text === '') return null;
+  if (typeof text === 'string' && !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) {
+    throw invalidQuantity(value, context);
+  }
 
   const quantity = Number(text);
   if (!Number.isFinite(quantity) || quantity < 0) throw invalidQuantity(value, context);
 
   const rounded = Math.round(quantity * 1000000) / 1000000;
+  if (!Number.isFinite(rounded)) throw invalidQuantity(value, context);
   return rounded === 0 ? null : rounded;
 }
 
