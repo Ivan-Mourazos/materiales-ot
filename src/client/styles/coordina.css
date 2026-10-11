@@ -275,3 +275,21 @@
   color: var(--accent-ink);
   transform: translateY(1px);
 }
+
+/* ── Marco: Board.tsx 2161 `mx-auto flex min-h-full w-full max-w-[1800px] flex-col` ──
+   En pantallas muy anchas todo queda centrado. Asignaciones y Artículos (zonas de trabajo,
+   anchas) llenan el marco; las listas van centradas con el mismo ancho, como las de
+   CoordinaOT. */
+.app-shell {
+  margin-inline: auto;
+  max-width: 1800px;
+  width: 100%;
+}
+
+.models-view,
+.drafts-view,
+.history-view {
+  margin-inline: auto;
+  max-width: 1440px;
+  width: 100%;
+}
