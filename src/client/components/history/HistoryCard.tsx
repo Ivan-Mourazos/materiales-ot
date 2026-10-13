@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { ChevronDown, Copy, FileSpreadsheet } from 'lucide-react';
 import type { HistoryEntry } from '../../types';
 import { formatDisplayText, formatNumber, historyDateFormat } from '../../utils';
@@ -10,6 +10,7 @@ export function HistoryCard({
   entry: HistoryEntry;
   onReuse: (entry: HistoryEntry) => void;
 }) {
+  const detailId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const overwrittenCount =
     entry.files.filter((file) => file.overwritten).length +
@@ -32,6 +33,7 @@ export function HistoryCard({
           type="button"
           onClick={() => setIsOpen((current) => !current)}
           aria-expanded={isOpen}
+          aria-controls={detailId}
         >
           <ChevronDown className="history-chevron" aria-hidden="true" />
           <div className="history-title">
@@ -68,13 +70,17 @@ export function HistoryCard({
       </div>
 
       {isOpen && (
-        <div className="history-detail">
+        <div className="history-detail" id={detailId}>
           {entry.ofs.map((ofBlock) => (
             <div className="history-of" key={ofBlock.of}>
               <div className="history-of-head">
-                <strong>OF {ofBlock.of}</strong>
-                {ofBlock.description && <em>{ofBlock.description}</em>}
-                <span>{fileLabelFor(entry, ofBlock.of)}</span>
+                <div>
+                  <strong>OF {ofBlock.of}</strong>
+                  {ofBlock.description && <em> — {ofBlock.description}</em>}
+                </div>
+                <span className="history-of-count">
+                  {ofBlock.materials.length} {ofBlock.materials.length === 1 ? 'artículo' : 'artículos'}
+                </span>
               </div>
               <table className="history-table">
                 <thead>
@@ -96,6 +102,9 @@ export function HistoryCard({
                   ))}
                 </tbody>
               </table>
+              {fileLabelFor(entry, ofBlock.of) && (
+                <div className="history-of-file">{fileLabelFor(entry, ofBlock.of)}</div>
+              )}
             </div>
           ))}
           {entry.orderArchive && (

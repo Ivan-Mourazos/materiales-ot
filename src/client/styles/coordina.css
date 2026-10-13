@@ -217,7 +217,7 @@
    borde dorado de la tarjeta abierta ni del borrador en edición. */
 .model-card:not(.open):hover,
 .draft-card:not(.open):not(.active-working):hover,
-.history-card:hover {
+.history-card:not(.open):hover {
   border-color: var(--border-strong);
   box-shadow: var(--panel-shadow);
 }

@@ -272,7 +272,8 @@
   height: 15px;
 }
 
-.draft-detail {
+.draft-detail,
+.history-detail {
   padding: 0 18px 18px;
   border-top: 1px solid var(--border);
   background: var(--surface-2);
@@ -281,7 +282,8 @@
   gap: 14px;
 }
 
-.draft-of-block {
+.draft-of-block,
+.history-of {
   margin-top: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -289,7 +291,8 @@
   padding: 12px 16px;
 }
 
-.draft-of-head {
+.draft-of-head,
+.history-of-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -299,24 +302,28 @@
   gap: 12px;
 }
 
-.draft-of-head strong {
+.draft-of-head strong,
+.history-of-head strong {
   font-size: 14px;
   color: var(--ink);
 }
 
-.draft-of-head em {
+.draft-of-head em,
+.history-of-head em {
   font-style: normal;
   font-size: 13px;
   color: var(--ink-2);
 }
 
-.draft-table {
+.draft-table,
+.history-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
 
-.draft-table th {
+.draft-table th,
+.history-table th {
   text-align: left;
   padding: 6px 10px;
   color: var(--ink-3);
@@ -327,13 +334,15 @@
   border-bottom: 1px solid var(--border);
 }
 
-.draft-table td {
+.draft-table td,
+.history-table td {
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
   color: var(--ink);
 }
 
-.draft-table tr:last-child td {
+.draft-table tr:last-child td,
+.history-table tr:last-child td {
   border-bottom: none;
 }
 
