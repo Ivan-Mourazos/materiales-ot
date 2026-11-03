@@ -74,6 +74,9 @@ export type OrderDraft = {
   notes?: string;
   ofs: OfBlock[];
   createdAt: string;
+  /** Quién lo creó / cambió por última vez (desde la 0.5.0; los antiguos no lo tienen). */
+  createdBy?: string;
+  updatedBy?: string;
   updatedAt: string;
   totals: { ofs: number; lines: number; units: number };
   sourceModelName?: string;
@@ -110,6 +113,9 @@ export type ConnectionState = 'checking' | 'ok' | 'error';
 export type HistoryEntry = {
   id: string;
   createdAt: string;
+  /** Quién lo creó / cambió por última vez (desde la 0.5.0; los antiguos no lo tienen). */
+  createdBy?: string;
+  updatedBy?: string;
   orderCode: string;
   ofs: { of: string; description?: string; materials: { code: string; description: string; quantity: number }[] }[];
   files: { of: string; filename: string; overwritten: boolean }[];
@@ -159,6 +165,9 @@ export type AssignmentModel = {
   /** Familia de producto (texto libre). Ausente = "Sin categoría". */
   category?: string;
   createdAt: string;
+  /** Quién lo creó / cambió por última vez (desde la 0.5.0; los antiguos no lo tienen). */
+  createdBy?: string;
+  updatedBy?: string;
   updatedAt?: string;
   parts: ModelPart[];
 };

@@ -43,7 +43,10 @@ export function HistoryCard({
                 : `OF ${entry.ofs.map((item) => item.of).join(', ')}`}
             </strong>
             {descriptions && <em>{descriptions}</em>}
-            <span>{historyDateFormat.format(new Date(entry.createdAt))}</span>
+            <span>
+              {historyDateFormat.format(new Date(entry.createdAt))}
+              {entry.createdBy ? ` · generado por ${entry.createdBy}` : ''}
+            </span>
           </div>
           <div className="history-meta">
             <span className="history-chip">

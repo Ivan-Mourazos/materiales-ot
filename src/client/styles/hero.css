@@ -359,3 +359,139 @@ html[data-estilo='hero'] .toast:not(.leaving) {
     animation: none;
   }
 }
+
+/* ── «¿Quién eres?» (WhoAreYouDialog.tsx), como en Toldos Testar: un botón por técnico con su
+   círculo de iniciales; el elegido, en dorado. ── */
+.model-dialog .who-are-you-modal {
+  position: relative;
+  width: min(36rem, 100%);
+  padding: 1.5rem;
+}
+.who-are-you-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+.who-are-you-heading {
+  text-align: center;
+}
+.who-are-you-heading > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.who-are-you-heading h2 {
+  margin: 2px 0 4px;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.who-are-you-heading p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.who-are-you-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+.who-are-you-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--control-border);
+  border-radius: 1rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+.who-are-you-option:hover {
+  border-color: var(--control-active-border);
+  transform: scale(1.03);
+}
+.who-are-you-option.is-current {
+  border-color: var(--control-active-border);
+  background: color-mix(in srgb, var(--color-brand-400) 16%, var(--surface));
+}
+.who-are-you-option:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.who-are-you-avatar,
+.usuario-avatar {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-brand-500);
+  color: #1a1206;
+  font-weight: 700;
+}
+.who-are-you-avatar {
+  width: 3.5rem;
+  height: 3.5rem;
+  font-size: 1.125rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
+.usuario-avatar {
+  width: 1.375rem;
+  height: 1.375rem;
+  font-size: 0.625rem;
+}
+.usuario-chip {
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text);
+}
+.who-are-you-other-link {
+  justify-self: center;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.who-are-you-other-link:hover {
+  color: var(--text);
+}
+.who-are-you-other {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.who-are-you-other .field {
+  flex: 1;
+}
+
+/* En Hero: tarjetas blancas sin borde, con la sombra de los paneles; la elegida, con anillo dorado. */
+html[data-estilo='hero'] .who-are-you-option {
+  border-color: transparent;
+  box-shadow: var(--hero-sombra-panel), 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+html[data-estilo='hero'] .who-are-you-option:hover {
+  border-color: transparent;
+  box-shadow: var(--hero-sombra-panel), 0 0 0 2px var(--hero-relleno-encima);
+}
+html[data-estilo='hero'] .who-are-you-option.is-current {
+  box-shadow: 0 0 0 2px var(--hero-anillo);
+}
+html[data-estilo='hero'] .usuario-chip:hover {
+  background: var(--hero-relleno-encima);
+}
+@media (prefers-reduced-motion: reduce) {
+  .who-are-you-option,
+  .who-are-you-option:hover {
+    transition: none;
+    transform: none;
+  }
+}

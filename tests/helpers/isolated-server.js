@@ -5,7 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // Módulos del servidor que leen y escriben en data/. Se importan entre sí, así que van juntos.
-const serverModules = ['models.js', 'drafts.js', 'jsonStore.js', 'quantity.js', 'httpError.js'];
+const serverModules = ['models.js', 'drafts.js', 'jsonStore.js', 'quantity.js', 'httpError.js', 'userName.js', 'audit.js'];
 
 /** Copia los módulos a una carpeta temporal: su data/ queda aislada de la del proyecto. */
 export async function isolatedServer(t) {

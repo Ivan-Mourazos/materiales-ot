@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { httpError } from './httpError.js';
 import { assertExpectedVersion, nextVersion, readJsonArray, writeJsonArray } from './jsonStore.js';
 import { normalizeStoredQuantity } from './quantity.js';
+import { cleanUserName } from './userName.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modelsFile = path.join(__dirname, '..', 'data', 'models.json');
@@ -42,7 +43,8 @@ export async function getModelById(id) {
   return models.find((m) => m.id === id) || null;
 }
 
-export function saveModel(modelData, { mustExist = false } = {}) {
+export function saveModel(modelData, { mustExist = false, user = '' } = {}) {
+  const author = cleanUserName(user);
   let resultModel = null;
 
   writeQueue = writeQueue
@@ -66,6 +68,7 @@ export function saveModel(modelData, { mustExist = false } = {}) {
           name: String(modelData.name || '').trim() || current.name,
           description: String(modelData.description ?? current.description ?? '').trim(),
           parts,
+          ...(author ? { updatedBy: author } : {}),
           updatedAt: nextVersion(current.updatedAt || current.createdAt)
         }, category);
         models[existingIndex] = resultModel;
@@ -75,6 +78,7 @@ export function saveModel(modelData, { mustExist = false } = {}) {
           id: modelData.id || randomUUID(),
           name: String(modelData.name || '').trim() || 'Nuevo Modelo',
           description: String(modelData.description || '').trim(),
+          ...(author ? { createdBy: author, updatedBy: author } : {}),
           createdAt: now,
           updatedAt: now,
           parts

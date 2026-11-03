@@ -49,6 +49,8 @@ import { SaveDraftModal } from './components/drafts/SaveDraftModal';
 import { CopyConsumptionModal } from './components/assignments/CopyConsumptionModal';
 import { useTheme } from './hooks/useTheme';
 import { useToasts } from './hooks/useToasts';
+import { getUserName, instalarCabeceraUsuario, setUserName } from './currentUser';
+import { WhoAreYouDialog } from './components/common/WhoAreYouDialog';
 
 const storageKey = 'materiales-ot-state-v3';
 
@@ -117,6 +119,9 @@ function App() {
   const [, startTransition] = useTransition();
   const { resolved: theme, toggle: toggleTheme } = useTheme();
   const { toasts, pushToast, dismissToast } = useToasts();
+  // Quién usa la web: se pide la primera vez y viaja en cada cambio (currentUser.ts)
+  const [userName, setUserNameState] = useState(getUserName);
+  const [isWhoAreYouOpen, setIsWhoAreYouOpen] = useState(() => !getUserName());
   const { saveVersioned, conflictDialog } = useVersionedSave();
 
   useEffect(() => {
@@ -831,6 +836,8 @@ function App() {
         networkState={networkState}
         theme={theme}
         onToggleTheme={toggleTheme}
+        userName={userName}
+        onChangeUser={() => setIsWhoAreYouOpen(true)}
         navigation={
           <Navigation activeTab={activeTab} onChangeTab={setActiveTab} draftsCount={draftsCount} />
         }
@@ -1010,11 +1017,26 @@ function App() {
         />
       )}
 
+      {isWhoAreYouOpen && (
+        <WhoAreYouDialog
+          current={userName}
+          required={!userName}
+          onClose={() => setIsWhoAreYouOpen(false)}
+          onChoose={(name) => {
+            const saved = setUserName(name);
+            setUserNameState(saved);
+            setIsWhoAreYouOpen(false);
+            if (userName && saved !== userName) pushToast(`Ahora los cambios se apuntan a nombre de ${saved}.`, 'info');
+          }}
+        />
+      )}
+
       {conflictDialog}
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </main>
   );
 }
 
+instalarCabeceraUsuario();
 iniciarPildoras();
 createRoot(document.getElementById('root')!).render(<App />);

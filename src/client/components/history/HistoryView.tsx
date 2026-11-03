@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { History, Loader2 } from 'lucide-react';
 import type { HistoryEntry } from '../../types';
 import { HistoryCard } from './HistoryCard';
+import { AuditLog } from './AuditLog';
 
 export function HistoryView({
   version,
@@ -52,6 +53,7 @@ export function HistoryView({
       ) : (
         entries.map((entry) => <HistoryCard key={entry.id} entry={entry} onReuse={onReuse} />)
       )}
+      <AuditLog version={version} />
     </section>
   );
 }

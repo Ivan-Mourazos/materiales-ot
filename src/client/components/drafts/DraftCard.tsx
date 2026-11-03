@@ -9,7 +9,7 @@ import {
   Trash2
 } from 'lucide-react';
 import type { OrderDraft } from '../../types';
-import { formatDisplayText, formatNumber, historyDateFormat } from '../../utils';
+import { authorText, formatDisplayText, formatNumber, historyDateFormat } from '../../utils';
 import { countMissingQuantities, hasQuantity, sumQuantities } from '../../quantities';
 
 export function DraftCard({
@@ -67,6 +67,7 @@ export function DraftCard({
             {draft.notes && <em>{draft.notes}</em>}
             <span>
               Actualizado el {historyDateFormat.format(new Date(draft.updatedAt || draft.createdAt))}
+              {authorText(draft)}
             </span>
           </div>
 

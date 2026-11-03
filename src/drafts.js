@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { httpError } from './httpError.js';
 import { assertExpectedVersion, nextVersion, readJsonArray, writeJsonArray } from './jsonStore.js';
 import { normalizeStoredQuantity } from './quantity.js';
+import { cleanUserName } from './userName.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const draftsFile = path.join(__dirname, '..', 'data', 'drafts.json');
@@ -21,7 +22,8 @@ export async function getDraftById(id) {
   return drafts.find((d) => d.id === id) || null;
 }
 
-export function saveDraft(draftData, { mustExist = false } = {}) {
+export function saveDraft(draftData, { mustExist = false, user = '' } = {}) {
+  const author = cleanUserName(user);
   let resultDraft = null;
 
   writeQueue = writeQueue
@@ -51,6 +53,7 @@ export function saveDraft(draftData, { mustExist = false } = {}) {
           ofs: sanitizedOfs,
           totals,
           sourceModelName: draftData.sourceModelName || current.sourceModelName || undefined,
+          ...(author ? { updatedBy: author } : {}),
           updatedAt: nextVersion(current.updatedAt || current.createdAt)
         };
         drafts[existingIndex] = resultDraft;
@@ -64,6 +67,7 @@ export function saveDraft(draftData, { mustExist = false } = {}) {
           ofs: sanitizedOfs,
           totals,
           sourceModelName: draftData.sourceModelName || undefined,
+          ...(author ? { createdBy: author, updatedBy: author } : {}),
           createdAt: now,
           updatedAt: now
         };

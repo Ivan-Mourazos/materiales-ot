@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { ChevronDown, Copy, Edit2, Layers, Play, Trash2 } from 'lucide-react';
 import type { AssignmentModel } from '../../types';
-import { formatDisplayText, formatNumber, historyDateFormat } from '../../utils';
+import { authorText, formatDisplayText, formatNumber, historyDateFormat } from '../../utils';
 import { countMissingQuantities, hasQuantity } from '../../quantities';
 
 export function ModelCard({
@@ -41,6 +41,7 @@ export function ModelCard({
             {model.description && <em>{model.description}</em>}
             <span>
               Actualizado el {historyDateFormat.format(new Date(model.updatedAt || model.createdAt))}
+              {authorText(model)}
             </span>
           </div>
           <div className="model-meta">

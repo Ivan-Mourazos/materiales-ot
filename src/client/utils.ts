@@ -128,3 +128,9 @@ export function formatDisplayText(value?: string | null) {
 function applyWordCorrection(word: string) {
   return wordCorrections[word] || word;
 }
+
+/** « por Iván» para las fechas de borradores y modelos; vacío en los guardados antes de la 0.5.0. */
+export function authorText(item: { updatedBy?: string; createdBy?: string }) {
+  const author = item.updatedBy || item.createdBy;
+  return author ? ` por ${author}` : '';
+}

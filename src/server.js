@@ -22,6 +22,7 @@ import { buildOfWorkbook, buildOrderArchiveWorkbook, buildReservationWorkbook } 
 import { appendHistory, listHistory } from './history.js';
 import { deleteModel, getModelById, listModels, saveModel } from './models.js';
 import { deleteDraft, getDraftById, listDrafts, saveDraft } from './drafts.js';
+import { appendAudit, listAudit, listKnownUsers, userFromRequest } from './audit.js';
 import { httpError } from './httpError.js';
 import { findOfMismatches, orderKey } from './orders.js';
 import { normalizeReservation } from './validation.js';
@@ -70,6 +71,15 @@ app.get('/api/history', async (req, res, next) => {
   }
 });
 
+// Quién hace cada cambio (ver audit.js): para saberlo, no para impedirlo.
+app.get('/api/audit', async (req, res, next) => {
+  try {
+    res.json({ entries: await listAudit(req.query.limit), users: await listKnownUsers() });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/models', async (_req, res, next) => {
   try {
     const models = await listModels();
@@ -99,7 +109,9 @@ app.post('/api/models', async (req, res, next) => {
       res.status(400).json({ error: 'El nombre del modelo es obligatorio.' });
       return;
     }
-    const saved = await saveModel(req.body);
+    const user = userFromRequest(req);
+    const saved = await saveModel(req.body, { user });
+    auditSaved('model', saved, user);
     res.status(201).json({ ok: true, model: saved });
   } catch (error) {
     next(error);
@@ -113,7 +125,9 @@ app.put('/api/models/:id', async (req, res, next) => {
       res.status(400).json({ error: 'El nombre del modelo es obligatorio.' });
       return;
     }
-    const saved = await saveModel({ ...req.body, id: req.params.id }, { mustExist: true });
+    const user = userFromRequest(req);
+    const saved = await saveModel({ ...req.body, id: req.params.id }, { mustExist: true, user });
+    auditSaved('model', saved, user);
     res.json({ ok: true, model: saved });
   } catch (error) {
     next(error);
@@ -122,7 +136,9 @@ app.put('/api/models/:id', async (req, res, next) => {
 
 app.delete('/api/models/:id', async (req, res, next) => {
   try {
+    const existing = await getModelById(req.params.id);
     await deleteModel(req.params.id);
+    if (existing) appendAudit({ action: 'delete', kind: 'model', id: existing.id, name: existing.name, user: userFromRequest(req) });
     res.json({ ok: true });
   } catch (error) {
     next(error);
@@ -153,7 +169,9 @@ app.get('/api/drafts/:id', async (req, res, next) => {
 
 app.post('/api/drafts', async (req, res, next) => {
   try {
-    const saved = await saveDraft(req.body);
+    const user = userFromRequest(req);
+    const saved = await saveDraft(req.body, { user });
+    auditSaved('draft', saved, user);
     res.status(201).json({ ok: true, draft: saved });
   } catch (error) {
     next(error);
@@ -162,7 +180,9 @@ app.post('/api/drafts', async (req, res, next) => {
 
 app.put('/api/drafts/:id', async (req, res, next) => {
   try {
-    const saved = await saveDraft({ ...req.body, id: req.params.id }, { mustExist: true });
+    const user = userFromRequest(req);
+    const saved = await saveDraft({ ...req.body, id: req.params.id }, { mustExist: true, user });
+    auditSaved('draft', saved, user);
     res.json({ ok: true, draft: saved });
   } catch (error) {
     next(error);
@@ -171,7 +191,9 @@ app.put('/api/drafts/:id', async (req, res, next) => {
 
 app.delete('/api/drafts/:id', async (req, res, next) => {
   try {
+    const existing = await getDraftById(req.params.id);
     await deleteDraft(req.params.id);
+    if (existing) appendAudit({ action: 'delete', kind: 'draft', id: existing.id, name: existing.name, user: userFromRequest(req) });
     res.json({ ok: true });
   } catch (error) {
     next(error);
@@ -423,7 +445,10 @@ app.post('/api/export/save', async (req, res, next) => {
       };
     }
 
-    await appendHistory(buildHistoryEntry(reservation, saved, orderArchive));
+    const user = userFromRequest(req);
+    const historyEntry = buildHistoryEntry(reservation, saved, orderArchive, user);
+    await appendHistory(historyEntry);
+    appendAudit({ action: 'generate', kind: 'reservation', id: historyEntry.id, name: reservation.orderCode || saved.map((item) => item.of).join(', '), user });
 
     res.json({ ok: true, saved, orderArchive });
   } catch (error) {
@@ -501,6 +526,18 @@ async function checkOfsInRps(reservation) {
   }
 }
 
+/** Apunta en el registro un guardado: es nuevo si su fecha de creación y de cambio coinciden. */
+function auditSaved(kind, saved, user) {
+  if (!saved) return;
+  appendAudit({
+    action: saved.createdAt === saved.updatedAt ? 'create' : 'update',
+    kind,
+    id: saved.id,
+    name: saved.name,
+    user
+  });
+}
+
 function sanitizeOf(value) {
   const clean = String(value || '')
     .trim()
@@ -551,12 +588,13 @@ async function writeFileAtomic(targetPath, buffer) {
   }
 }
 
-function buildHistoryEntry(reservation, saved, orderArchive) {
+function buildHistoryEntry(reservation, saved, orderArchive, user = '') {
   const lines = reservation.ofs.flatMap((ofBlock) => ofBlock.materials);
 
   return {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
+    ...(user ? { createdBy: user } : {}),
     orderCode: reservation.orderCode || '',
     ofs: reservation.ofs,
     files: saved.map(({ of, filename, overwritten }) => ({ of, filename, overwritten })),
