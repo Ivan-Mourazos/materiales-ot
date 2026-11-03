@@ -13,6 +13,8 @@ export function AssignmentWorkspace({
   isSavingToNetwork,
   activeDraft,
   onSave,
+  onImportOrderOfs,
+  isImportingOfs = false,
   onOpenSaveDraft,
   onQuickSaveDraft,
   isQuickSavingDraft = false,
@@ -36,6 +38,8 @@ export function AssignmentWorkspace({
   isSavingToNetwork: boolean;
   activeDraft?: { id: string; name: string } | null;
   onSave: () => void;
+  onImportOrderOfs: () => void;
+  isImportingOfs?: boolean;
   onOpenSaveDraft: () => void;
   onQuickSaveDraft?: () => void;
   isQuickSavingDraft?: boolean;
@@ -60,6 +64,8 @@ export function AssignmentWorkspace({
         isSavingToNetwork={isSavingToNetwork}
         activeDraft={activeDraft}
         onSave={onSave}
+        onImportOrderOfs={onImportOrderOfs}
+        isImportingOfs={isImportingOfs}
         onOpenSaveDraft={onOpenSaveDraft}
         onAddOf={onAddOf}
         onOpenLoadModel={onOpenLoadModel}

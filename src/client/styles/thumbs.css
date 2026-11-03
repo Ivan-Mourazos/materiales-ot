@@ -1,0 +1,105 @@
+/* ============================================================
+   Fotos de artículo (STKArticle.Image de RPS)
+   Miniatura cuadrada en catálogo, buscador y líneas de material;
+   grande en la ficha de stock. Sin foto: icono de caja.
+   ============================================================ */
+
+.article-thumb {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink-3);
+}
+
+.article-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.article-thumb.is-empty {
+  background: var(--surface-2);
+}
+
+.article-thumb.is-empty svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+.article-thumb-lg {
+  width: 96px;
+  height: 96px;
+  border-radius: 16px;
+}
+
+/* Catálogo: miniatura a la izquierda del código; al pulsarla se abre la ficha */
+.catalog-reference-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.article-thumb-button {
+  display: inline-flex;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  cursor: zoom-in;
+  transition: transform 120ms ease;
+}
+
+.article-thumb-button:active {
+  transform: scale(0.96);
+}
+
+.article-thumb-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Líneas de material de cada OF */
+.material-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.material-code .article-thumb {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+/* Buscador de artículos: miniatura a la izquierda de las tres líneas de texto */
+.result-item:has(> .article-thumb) {
+  grid-template-columns: 34px minmax(0, 1fr);
+  column-gap: 10px;
+}
+
+.result-item > .article-thumb {
+  grid-row: 1 / span 3;
+  align-self: center;
+}
+
+.result-item:has(> .article-thumb) > :not(.article-thumb) {
+  grid-column: 2;
+}
+
+/* Ficha de stock con foto: la columna del icono crece hasta la foto */
+.stock-detail-head:has(> .article-thumb-lg) {
+  grid-template-columns: 96px minmax(0, 1fr) 38px;
+}
+
+:root[data-theme='dark'] .article-thumb:not(.is-empty) {
+  border-color: transparent;
+}

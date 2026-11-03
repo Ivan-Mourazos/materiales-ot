@@ -6,12 +6,23 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
-import { checkDatabase, closeDatabase, getArticleStockDetails, listArticleFilters, listArticles, searchArticles } from './db.js';
+import {
+  checkDatabase,
+  closeDatabase,
+  getArticleImage,
+  getArticleStockDetails,
+  getOfOwners,
+  getOrderOfs,
+  listArticleFilters,
+  listArticles,
+  searchArticles
+} from './db.js';
 import { buildOfWorkbook, buildOrderArchiveWorkbook, buildReservationWorkbook } from './excel.js';
 import { appendHistory, listHistory } from './history.js';
 import { deleteModel, getModelById, listModels, saveModel } from './models.js';
 import { deleteDraft, getDraftById, listDrafts, saveDraft } from './drafts.js';
 import { httpError } from './httpError.js';
+import { findOfMismatches, orderKey } from './orders.js';
 import { normalizeReservation } from './validation.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -211,6 +222,39 @@ app.get('/api/article-list', async (req, res, next) => {
   }
 });
 
+app.get('/api/order-ofs', async (req, res, next) => {
+  try {
+    const order = String(req.query.order || '').trim();
+    if (!orderKey(order)) {
+      res.status(400).json({ error: 'Escribe un número de pedido válido (por ejemplo, AR2603201).' });
+      return;
+    }
+
+    res.json(await getOrderOfs(order));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/article-image/:code', async (req, res, next) => {
+  try {
+    const image = await getArticleImage(req.params.code);
+    if (!image || image.contentType === 'application/octet-stream') {
+      // El "no tiene foto" también se cachea un rato en el navegador.
+      res.setHeader('Cache-Control', 'public, max-age=600');
+      res.status(404).end();
+      return;
+    }
+
+    res
+      .setHeader('Content-Type', image.contentType)
+      .setHeader('Cache-Control', 'public, max-age=86400')
+      .send(image.buffer);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/article-stock', async (req, res, next) => {
   try {
     const idArticle = String(req.query.idArticle || '').trim();
@@ -275,6 +319,16 @@ app.post('/api/export/save', async (req, res, next) => {
         error: `Hay OFs duplicadas en la reserva: ${duplicated.join(', ')}.`
       });
       return;
+    }
+
+    // Que cada OF exista en RPS y sea de este pedido. Si RPS no responde no se bloquea:
+    // la reserva se puede generar igual, como antes de existir esta comprobación.
+    if (req.body?.confirmOfs !== true) {
+      const ofWarnings = await checkOfsInRps(reservation);
+      if (ofWarnings.length > 0) {
+        res.status(409).json({ needsOfConfirmation: true, ofWarnings });
+        return;
+      }
     }
 
     // Generar todos los libros antes de escribir nada: si algo falla
@@ -419,6 +473,17 @@ function sanitize(value) {
     .replace(/[^a-z0-9_-]+/gi, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80) || 'rps';
+}
+
+async function checkOfsInRps(reservation) {
+  try {
+    const ofs = reservation.ofs.map((ofBlock) => ofBlock.of);
+    const owners = await withTimeout(getOfOwners(ofs), 8000);
+    return findOfMismatches({ orderCode: reservation.orderCode, ofs, owners });
+  } catch (error) {
+    console.error('No se pudieron comprobar las OFs en RPS:', error);
+    return [];
+  }
 }
 
 function sanitizeOf(value) {

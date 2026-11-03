@@ -1,5 +1,6 @@
 import sql from 'mssql';
 import { config } from './config.js';
+import { orderKey, pieceFromOrderLine, toDottedOrderCode, toRpsOfCode } from './orders.js';
 
 let poolPromise;
 
@@ -209,7 +210,8 @@ function mapArticle(row) {
     inactiveDate: row.inactiveDate ? row.inactiveDate.toISOString() : null,
     isActive: !row.inactiveDate || row.inactiveDate > new Date(),
     detectedWidth: width.detectedWidth,
-    widthWarning: width.widthWarning
+    widthWarning: width.widthWarning,
+    hasImage: Boolean(row.hasImage)
   };
 }
 
@@ -340,6 +342,127 @@ export async function getArticleStockDetails(idArticle) {
   };
 }
 
+// OFs de un pedido, con la pieza de cada una (FACOrderLineSL.IDManufacturingOrder enlaza línea ↔ OF).
+// Primero se busca por igualdad exacta (usa índice); si no hay nada, comparando sin puntos.
+export async function getOrderOfs(orderCode) {
+  const key = orderKey(orderCode);
+  if (!key) return { order: null, ofs: [] };
+
+  const pool = await getPool();
+  const select = (where) => {
+    const request = pool.request();
+    request.input('company', sql.VarChar(10), config.db.company);
+    request.input('dotted', sql.VarChar(40), toDottedOrderCode(key) || key);
+    request.input('key', sql.VarChar(40), key);
+    return request.query(`
+      SELECT
+        m.CodManufacturingOrder AS ofCode,
+        m.InternalCode AS orderCode,
+        m.Quantity AS units,
+        a.CodArticle AS article,
+        ol.Description AS lineDescription,
+        ol.Comment AS lineComment
+      FROM dbo.CPRManufacturingOrder m
+      LEFT JOIN dbo.STKArticle a
+        ON a.IDArticle = m.IDArticle
+      OUTER APPLY (
+        SELECT TOP 1 l.Description, l.Comment
+        FROM dbo.FACOrderLineSL l
+        WHERE l.IDManufacturingOrder = m.IDManufacturingOrder
+      ) ol
+      WHERE m.CodCompany = @company
+        AND ${where}
+      ORDER BY m.CodManufacturingOrder;
+    `);
+  };
+
+  let result = await select('m.InternalCode = @dotted');
+  if (result.recordset.length === 0) {
+    result = await select(`REPLACE(m.InternalCode, '.', '') = @key`);
+  }
+
+  const rows = result.recordset;
+  return {
+    order: rows[0]?.orderCode?.trim() || null,
+    ofs: rows.map((row) => ({
+      of: String(row.ofCode).trim(),
+      piece: pieceFromOrderLine(row.lineDescription) || String(row.article || '').trim(),
+      units: Number(row.units) || 0,
+      article: row.article ? String(row.article).trim() : null,
+      comment: row.lineComment ? String(row.lineComment).replace(/\s+/g, ' ').trim().slice(0, 400) : null
+    }))
+  };
+}
+
+// Pedido al que pertenece cada OF. Las que no existen en RPS no salen en el Map.
+export async function getOfOwners(ofCodes) {
+  const codes = [...new Set(ofCodes.map(toRpsOfCode).filter(Boolean))].slice(0, 200);
+  const owners = new Map();
+  if (codes.length === 0) return owners;
+
+  const pool = await getPool();
+  const request = pool.request();
+  request.input('company', sql.VarChar(10), config.db.company);
+  codes.forEach((code, index) => request.input(`of${index}`, sql.VarChar(20), code));
+  const result = await request.query(`
+    SELECT CodManufacturingOrder AS ofCode, InternalCode AS orderCode
+    FROM dbo.CPRManufacturingOrder
+    WHERE CodCompany = @company
+      AND CodManufacturingOrder IN (${codes.map((_, index) => `@of${index}`).join(', ')});
+  `);
+
+  for (const row of result.recordset) {
+    owners.set(String(row.ofCode).trim(), row.orderCode ? String(row.orderCode).trim() : '');
+  }
+  return owners;
+}
+
+// Fotos de artículo: miniaturas JPEG guardadas en STKArticle.Image (de 5 a 30 KB).
+// Se guardan en memoria (también los "no tiene foto") para no releer el blob en
+// cada tabla; con 500 entradas son como mucho unos 15 MB.
+const imageCache = new Map();
+const imageCacheMaxEntries = 500;
+const imageTtlMs = 60 * 60 * 1000;
+
+export async function getArticleImage(code) {
+  const cleanCode = String(code || '').trim().toUpperCase();
+  if (!cleanCode || cleanCode.length > 80) return null;
+
+  const hit = imageCache.get(cleanCode);
+  if (hit && hit.expires > Date.now()) return hit.image;
+
+  const pool = await getPool();
+  const request = pool.request();
+  request.input('company', sql.VarChar(10), config.db.company);
+  request.input('code', sql.VarChar(80), cleanCode);
+  const result = await request.query(`
+    SELECT TOP 1 Image AS image
+    FROM dbo.STKArticle
+    WHERE CodCompany = @company
+      AND CodArticle = @code
+      AND DATALENGTH(Image) > 0;
+  `);
+
+  const buffer = result.recordset[0]?.image || null;
+  const image = buffer ? { buffer, contentType: detectImageType(buffer) } : null;
+
+  imageCache.delete(cleanCode);
+  imageCache.set(cleanCode, { image, expires: Date.now() + imageTtlMs });
+  if (imageCache.size > imageCacheMaxEntries) {
+    imageCache.delete(imageCache.keys().next().value);
+  }
+
+  return image;
+}
+
+export function detectImageType(buffer) {
+  if (buffer[0] === 0xff && buffer[1] === 0xd8) return 'image/jpeg';
+  if (buffer[0] === 0x89 && buffer[1] === 0x50) return 'image/png';
+  if (buffer[0] === 0x47 && buffer[1] === 0x49) return 'image/gif';
+  if (buffer[0] === 0x42 && buffer[1] === 0x4d) return 'image/bmp';
+  return 'application/octet-stream';
+}
+
 async function getArticleSummary(idArticle) {
   const pool = await getPool();
   const request = pool.request();
@@ -451,7 +574,8 @@ async function searchArticlesUncached({ query = '', limit = 25 }) {
       c.NormaUNE AS normaUne,
       detail.BlockedPurchase AS blockedPurchase,
       detail.BlockedManufacturing AS blockedManufacturing,
-      a.InactiveDate AS inactiveDate
+      a.InactiveDate AS inactiveDate,
+      CASE WHEN DATALENGTH(a.Image) > 0 THEN 1 ELSE 0 END AS hasImage
     FROM dbo.STKArticle a
     LEFT JOIN dbo._STKArticle_Custom c
       ON c.IDArticle = a.IDArticle
@@ -560,7 +684,8 @@ async function listArticlesUncached({
       c.NormaUNE AS normaUne,
       detail.BlockedPurchase AS blockedPurchase,
       detail.BlockedManufacturing AS blockedManufacturing,
-      a.InactiveDate AS inactiveDate
+      a.InactiveDate AS inactiveDate,
+      CASE WHEN DATALENGTH(a.Image) > 0 THEN 1 ELSE 0 END AS hasImage
     FROM dbo.STKArticle a
     LEFT JOIN dbo._STKArticle_Custom c
       ON c.IDArticle = a.IDArticle

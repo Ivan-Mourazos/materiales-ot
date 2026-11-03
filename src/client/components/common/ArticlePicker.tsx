@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
 import { Loader2, Search } from 'lucide-react';
+import { ArticleThumb } from './ArticleThumb';
 import type { Article } from '../../types';
 import { formatDisplayText } from '../../utils';
 
@@ -114,6 +115,7 @@ export const ArticlePicker = forwardRef<ArticlePickerHandle, {
               id={id + '-option-' + index} type="button" role="option" aria-selected={activeIndex === index}
               tabIndex={-1} key={article.idArticle} onMouseDown={(event) => event.preventDefault()}
               onClick={() => selectArticle(article)}>
+              <ArticleThumb key={article.code} code={article.code} hasImage={article.hasImage} />
               <strong>{article.code}</strong>
               <span>{formatDisplayText(article.description)}</span>
               <em>{[article.family, article.subfamily, article.productionSection].filter(Boolean).map((value) => formatDisplayText(value || '')).join(' · ')}</em>

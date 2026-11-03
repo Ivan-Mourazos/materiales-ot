@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Loader2, MapPin, X } from 'lucide-react';
+import { ArticleThumb } from '../common/ArticleThumb';
 import type { Article, StockDetailResponse, StockDetailRow } from '../../types';
 import { formatDisplayText, formatNumber, formatStockDate, roundQuantity } from '../../utils';
 
@@ -70,9 +71,13 @@ export function StockDetailModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="stock-detail-head">
-          <div className="modal-icon stock-detail-icon">
-            <MapPin aria-hidden="true" />
-          </div>
+          {article.hasImage ? (
+            <ArticleThumb key={article.code} code={article.code} hasImage size="lg" />
+          ) : (
+            <div className="modal-icon stock-detail-icon">
+              <MapPin aria-hidden="true" />
+            </div>
+          )}
           <div>
             <h2 id="stock-detail-title">Stock de {article.code}</h2>
             <p>{formatDisplayText(article.description) || 'Artículo sin descripción'}</p>

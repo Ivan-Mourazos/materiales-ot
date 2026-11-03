@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
@@ -22,6 +22,7 @@ import type {
   ToastType
 } from './types';
 import { roundQuantity, uid } from './utils';
+import { mergeOrderOfs, type RpsOrderOf } from './orderOfs';
 import { describeActiveModel } from './activeModel';
 import {
   addQuantities,
@@ -150,6 +151,10 @@ function App() {
   const [isSavingToNetwork, setIsSavingToNetwork] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('assignments');
   const [overwritePrompt, setOverwritePrompt] = useState<string[] | null>(null);
+  const [ofWarningsPrompt, setOfWarningsPrompt] = useState<string[] | null>(null);
+  const [isImportingOfs, setIsImportingOfs] = useState(false);
+  // Lo ya confirmado en este intento de generar: al aceptar el siguiente aviso no se vuelve a preguntar.
+  const lastSaveConfirmations = useRef({ confirmOverwrite: false, confirmOfs: false });
   const [missingQuantities, setMissingQuantities] = useState<MissingQuantity[] | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [isSaveAsModelOpen, setIsSaveAsModelOpen] = useState(false);
@@ -243,6 +248,44 @@ function App() {
 
   function addOf() {
     startTransition(() => setOfs((current) => [...current, createOf()]));
+  }
+
+  async function importOrderOfs() {
+    const code = orderCode.trim();
+    if (!code || isImportingOfs) return;
+    setIsImportingOfs(true);
+
+    try {
+      const response = await fetch(`/api/order-ofs?order=${encodeURIComponent(code)}`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudieron consultar las OFs en RPS.');
+
+      const rpsOfs: RpsOrderOf[] = Array.isArray(data.ofs) ? data.ofs : [];
+      if (rpsOfs.length === 0) {
+        pushToast(`RPS no tiene OFs para el pedido ${code}. Revisa el número.`, 'error');
+        return;
+      }
+
+      const previous = ofs;
+      const result = mergeOrderOfs(previous, rpsOfs, (of, description) => ({ ...createOf(description), of }));
+      if (result.added === 0) {
+        pushToast(`Las ${rpsOfs.length} OFs del pedido ${data.order} ya estaban en la asignación.`, 'info');
+        if (result.ofs.some((block, index) => block !== previous[index])) setOfs(result.ofs);
+        return;
+      }
+
+      setOfs(result.ofs);
+      const already = result.alreadyThere > 0 ? ` (${result.alreadyThere} ya estaban)` : '';
+      pushToast(
+        `${result.added === 1 ? 'Añadida 1 OF' : `Añadidas ${result.added} OFs`} del pedido ${data.order}${already}.`,
+        'ok',
+        { label: 'Deshacer', run: () => setOfs(previous) }
+      );
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : 'Error inesperado.', 'error');
+    } finally {
+      setIsImportingOfs(false);
+    }
   }
 
   function removeOf(id: string) {
@@ -746,7 +789,11 @@ function App() {
     }, 0);
   }
 
-  async function saveExcelToNetwork(confirmOverwrite = false) {
+  async function saveExcelToNetwork({
+    confirmOverwrite = false,
+    confirmOfs = false
+  }: { confirmOverwrite?: boolean; confirmOfs?: boolean } = {}) {
+    lastSaveConfirmations.current = { confirmOverwrite, confirmOfs };
     if (duplicateOfs.size > 0) {
       pushToast(
         `Hay OFs repetidas: ${Array.from(duplicateOfs).join(', ')}. Corrige los números antes de generar.`,
@@ -770,6 +817,7 @@ function App() {
         body: JSON.stringify({
           orderCode,
           confirmOverwrite,
+          confirmOfs,
           ofs: ofs.map((ofBlock) => ({
             of: ofBlock.of,
             description: ofBlock.description,
@@ -779,6 +827,11 @@ function App() {
       });
 
       const data = await response.json().catch(() => ({}));
+
+      if (response.status === 409 && data.needsOfConfirmation) {
+        setOfWarningsPrompt(Array.isArray(data.ofWarnings) ? data.ofWarnings : []);
+        return;
+      }
 
       if (response.status === 409 && data.needsConfirmation) {
         setOverwritePrompt(data.existing || []);
@@ -848,6 +901,8 @@ function App() {
           isSavingToNetwork={isSavingToNetwork}
           activeDraft={activeDraft}
           onSave={() => saveExcelToNetwork()}
+          onImportOrderOfs={importOrderOfs}
+          isImportingOfs={isImportingOfs}
           onOpenSaveDraft={() => setIsSaveDraftOpen(true)}
           onQuickSaveDraft={handleQuickSaveDraft}
           isQuickSavingDraft={isQuickSavingDraft}
@@ -955,7 +1010,27 @@ function App() {
           onCancel={() => setOverwritePrompt(null)}
           onConfirm={() => {
             setOverwritePrompt(null);
-            saveExcelToNetwork(true);
+            saveExcelToNetwork({ ...lastSaveConfirmations.current, confirmOverwrite: true });
+          }}
+        />
+      )}
+
+      {ofWarningsPrompt && (
+        <ConfirmDialog
+          title="Revisa las OFs antes de generar"
+          description={
+            <>
+              Según RPS, estas OFs <strong>no cuadran con el pedido {orderCode.trim() || 'indicado'}</strong>. Si
+              generas igualmente, la reserva irá a esas OFs tal cual.
+            </>
+          }
+          items={ofWarningsPrompt}
+          confirmLabel="Generar igualmente"
+          initialFocus="cancel"
+          onCancel={() => setOfWarningsPrompt(null)}
+          onConfirm={() => {
+            setOfWarningsPrompt(null);
+            saveExcelToNetwork({ ...lastSaveConfirmations.current, confirmOfs: true });
           }}
         />
       )}

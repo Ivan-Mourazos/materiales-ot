@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
+import { ArticleThumb } from '../common/ArticleThumb';
 import type { OfBlock } from '../../types';
 import { formatDisplayText } from '../../utils';
 import { hasQuantity, parseQuantityInput, quantityInputValue, type Quantity } from '../../quantities';
@@ -36,7 +37,10 @@ export function MaterialTable({
             ofBlock.materials.map((line) => (
               <tr key={line.id}>
                 <td>
-                  <strong>{line.code}</strong>
+                  <span className="material-code">
+                    <ArticleThumb key={line.code} code={line.code} />
+                    <strong>{line.code}</strong>
+                  </span>
                 </td>
                 <td>{formatDisplayText(line.description)}</td>
                 <td>

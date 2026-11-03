@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Loader2, MapPin, PackagePlus, RotateCcw, Search } from 'lucide-react';
+import { ArticleThumb } from '../common/ArticleThumb';
 import type { Article, ArticleFilters, CatalogFilterState, OfBlock } from '../../types';
 import { formatDisplayText, formatNumber, formatUnitLabel } from '../../utils';
 import { parseQuantityInput, type QuantityInput } from '../../quantities';
@@ -276,8 +277,21 @@ function ArticleRow({
   return (
     <tr>
       <td className="catalog-reference">
-        <strong>{article.code}</strong>
-        {article.normaUne && <span>{formatDisplayText(article.normaUne)}</span>}
+        <div className="catalog-reference-inner">
+          <button
+            className="article-thumb-button"
+            type="button"
+            onClick={() => onOpenStock(article)}
+            title={article.hasImage ? 'Ver foto y stock' : 'Ver stock'}
+            aria-label={`Ver ficha de ${article.code}`}
+          >
+            <ArticleThumb key={article.code} code={article.code} hasImage={article.hasImage} />
+          </button>
+          <div>
+            <strong>{article.code}</strong>
+            {article.normaUne && <span>{formatDisplayText(article.normaUne)}</span>}
+          </div>
+        </div>
       </td>
       <td className="catalog-article">
         <span>{formatDisplayText(article.description) || '-'}</span>

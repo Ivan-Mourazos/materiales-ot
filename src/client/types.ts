@@ -20,6 +20,8 @@ export type Article = {
   isActive?: boolean;
   detectedWidth?: number | null;
   widthWarning?: string | null;
+  /** Tiene foto en RPS (STKArticle.Image). */
+  hasImage?: boolean;
   stockTotal?: number | null;
   stocks?: { warehouseCode: string; warehouse: string; quantity: number }[];
   stockSeries?: string[];

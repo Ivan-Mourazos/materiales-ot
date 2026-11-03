@@ -1,4 +1,4 @@
-import { AlertTriangle, BookmarkPlus, Check, FileClock, Layers, Loader2, Plus, Save, X } from 'lucide-react';
+import { AlertTriangle, BookmarkPlus, Check, DownloadCloud, FileClock, Layers, Loader2, Plus, Save, X } from 'lucide-react';
 import { detectOrderYear, formatNumber } from '../../utils';
 
 export function SummaryPanel({
@@ -8,6 +8,8 @@ export function SummaryPanel({
   isSavingToNetwork,
   activeDraft,
   onSave,
+  onImportOrderOfs,
+  isImportingOfs,
   onOpenSaveDraft,
   onAddOf,
   onOpenLoadModel,
@@ -20,6 +22,8 @@ export function SummaryPanel({
   isSavingToNetwork: boolean;
   activeDraft?: { id: string; name: string } | null;
   onSave: () => void;
+  onImportOrderOfs: () => void;
+  isImportingOfs: boolean;
   onOpenSaveDraft: () => void;
   onAddOf: () => void;
   onOpenLoadModel: () => void;
@@ -57,6 +61,21 @@ export function SummaryPanel({
           </span>
         )}
       </label>
+
+      <button
+        className="button button-muted import-ofs-button"
+        type="button"
+        onClick={onImportOrderOfs}
+        disabled={!hasOrderCode || isImportingOfs}
+        title={
+          hasOrderCode
+            ? 'Añadir las OFs que tiene este pedido en RPS, con su pieza. No toca las que ya están.'
+            : 'Escribe el número de pedido para traer sus OFs'
+        }
+      >
+        {isImportingOfs ? <Loader2 className="spin" aria-hidden="true" /> : <DownloadCloud aria-hidden="true" />}
+        {isImportingOfs ? 'Consultando RPS…' : 'Traer OFs de RPS'}
+      </button>
 
       <div className="metrics">
         <Metric label="OFs" value={totals.ofs} />
