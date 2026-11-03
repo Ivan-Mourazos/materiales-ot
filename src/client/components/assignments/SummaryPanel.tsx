@@ -1,4 +1,4 @@
-import { AlertTriangle, BookmarkPlus, Check, DownloadCloud, FileClock, Layers, Loader2, Plus, Save, X } from 'lucide-react';
+import { AlertTriangle, BookmarkPlus, Check, ClipboardList, DownloadCloud, FileClock, Layers, Loader2, Plus, Save, X } from 'lucide-react';
 import { detectOrderYear, formatNumber } from '../../utils';
 
 export function SummaryPanel({
@@ -9,6 +9,7 @@ export function SummaryPanel({
   activeDraft,
   onSave,
   onImportOrderOfs,
+  onOpenCopyConsumption,
   isImportingOfs,
   onOpenSaveDraft,
   onAddOf,
@@ -23,6 +24,7 @@ export function SummaryPanel({
   activeDraft?: { id: string; name: string } | null;
   onSave: () => void;
   onImportOrderOfs: () => void;
+  onOpenCopyConsumption: () => void;
   isImportingOfs: boolean;
   onOpenSaveDraft: () => void;
   onAddOf: () => void;
@@ -119,6 +121,16 @@ export function SummaryPanel({
         <button className="button button-muted" type="button" onClick={onOpenLoadModel}>
           <Layers aria-hidden="true" />
           Usar un modelo
+        </button>
+
+        <button
+          className="button button-muted"
+          type="button"
+          onClick={onOpenCopyConsumption}
+          title="Traer de RPS lo que se gastó de verdad en cada OF de un pedido ya fabricado"
+        >
+          <ClipboardList aria-hidden="true" />
+          Copiar despiece real
         </button>
 
         <button

@@ -14,6 +14,7 @@ export function AssignmentWorkspace({
   activeDraft,
   onSave,
   onImportOrderOfs,
+  onOpenCopyConsumption,
   isImportingOfs = false,
   onOpenSaveDraft,
   onQuickSaveDraft,
@@ -39,6 +40,7 @@ export function AssignmentWorkspace({
   activeDraft?: { id: string; name: string } | null;
   onSave: () => void;
   onImportOrderOfs: () => void;
+  onOpenCopyConsumption: () => void;
   isImportingOfs?: boolean;
   onOpenSaveDraft: () => void;
   onQuickSaveDraft?: () => void;
@@ -65,6 +67,7 @@ export function AssignmentWorkspace({
         activeDraft={activeDraft}
         onSave={onSave}
         onImportOrderOfs={onImportOrderOfs}
+        onOpenCopyConsumption={onOpenCopyConsumption}
         isImportingOfs={isImportingOfs}
         onOpenSaveDraft={onOpenSaveDraft}
         onAddOf={onAddOf}

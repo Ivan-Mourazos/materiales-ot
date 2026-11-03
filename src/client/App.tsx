@@ -50,6 +50,7 @@ import { ModelsView } from './components/models/ModelsView';
 import { SaveAsModelModal } from './components/models/SaveAsModelModal';
 import { DraftsView } from './components/drafts/DraftsView';
 import { SaveDraftModal } from './components/drafts/SaveDraftModal';
+import { CopyConsumptionModal } from './components/assignments/CopyConsumptionModal';
 
 const storageKey = 'materiales-ot-state-v3';
 const themeStorageKey = 'materiales-ot-theme';
@@ -154,6 +155,7 @@ function App() {
   const [overwritePrompt, setOverwritePrompt] = useState<string[] | null>(null);
   const [ofWarningsPrompt, setOfWarningsPrompt] = useState<string[] | null>(null);
   const [isImportingOfs, setIsImportingOfs] = useState(false);
+  const [isCopyConsumptionOpen, setIsCopyConsumptionOpen] = useState(false);
   // Lo ya confirmado en este intento de generar: al aceptar el siguiente aviso no se vuelve a preguntar.
   const lastSaveConfirmations = useRef({ confirmOverwrite: false, confirmOfs: false });
   const [missingQuantities, setMissingQuantities] = useState<MissingQuantity[] | null>(null);
@@ -903,6 +905,7 @@ function App() {
           activeDraft={activeDraft}
           onSave={() => saveExcelToNetwork()}
           onImportOrderOfs={importOrderOfs}
+          onOpenCopyConsumption={() => setIsCopyConsumptionOpen(true)}
           isImportingOfs={isImportingOfs}
           onOpenSaveDraft={() => setIsSaveDraftOpen(true)}
           onQuickSaveDraft={handleQuickSaveDraft}
@@ -961,6 +964,27 @@ function App() {
           ofs={ofs}
           onClose={() => setIsSaveDraftOpen(false)}
           onSave={handleSaveDraftModal}
+        />
+      )}
+
+      {isCopyConsumptionOpen && (
+        <CopyConsumptionModal
+          currentOrderCode={orderCode}
+          hasContent={ofs.some((block) => block.of.trim() || block.materials.length > 0)}
+          onClose={() => setIsCopyConsumptionOpen(false)}
+          onLoad={(loadedOfs, summary) => {
+            const previous = { ofs, activeModel };
+            setOfs(loadedOfs.length ? loadedOfs : [createOf()]);
+            setActiveModel(null);
+            setIsCopyConsumptionOpen(false);
+            pushToast(summary, 'ok', {
+              label: 'Deshacer',
+              run: () => {
+                setOfs(previous.ofs);
+                setActiveModel(previous.activeModel);
+              }
+            });
+          }}
         />
       )}
 

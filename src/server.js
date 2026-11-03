@@ -12,6 +12,7 @@ import {
   getArticleImage,
   getArticleStockDetails,
   getOfOwners,
+  getOrderConsumption,
   getOrderOfs,
   listArticleFilters,
   listArticles,
@@ -231,6 +232,20 @@ app.get('/api/order-ofs', async (req, res, next) => {
     }
 
     res.json(await getOrderOfs(order));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/order-consumption', async (req, res, next) => {
+  try {
+    const order = String(req.query.order || '').trim();
+    if (!orderKey(order)) {
+      res.status(400).json({ error: 'Escribe un número de pedido válido (por ejemplo, AR2603201).' });
+      return;
+    }
+
+    res.json(await getOrderConsumption(order, { fixTransfers: req.query.fixTransfers !== 'false' }));
   } catch (error) {
     next(error);
   }

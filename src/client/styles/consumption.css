@@ -1,0 +1,197 @@
+/* ============================================================
+   Copiar despiece real de otro pedido (CopyConsumptionModal.tsx)
+   ============================================================ */
+
+.model-dialog .copy-consumption-modal {
+  width: min(900px, 100%);
+}
+
+.consumption-search {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.consumption-search .field {
+  flex: 1;
+}
+
+.consumption-stats {
+  margin: 0;
+}
+
+.consumption-transfers {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-l);
+  background: var(--warn-soft);
+  font-size: 13px;
+}
+
+.consumption-transfers p {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  color: var(--warn-ink);
+  font-weight: 600;
+}
+
+.consumption-transfers p svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.consumption-transfers ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 24px;
+}
+
+.consumption-ofs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.consumption-ofs svg {
+  width: 13px;
+  height: 13px;
+}
+
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.checkbox-line input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-brand-500);
+}
+
+.save-mode-options legend:not(.sr-only) {
+  margin-bottom: 6px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.consumption-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.consumption-list > li {
+  border-radius: var(--radius-m);
+  background: var(--zone);
+}
+
+.consumption-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+}
+
+.consumption-row > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ink-3);
+  transition: transform 160ms ease;
+}
+
+.consumption-list > li.open .consumption-row > svg {
+  transform: rotate(180deg);
+}
+
+.consumption-piece {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.consumption-count {
+  color: var(--ink-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.consumption-tag {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.consumption-tag.warn {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+
+.consumption-detail {
+  padding: 0 12px 12px 40px;
+}
+
+.consumption-detail table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.consumption-detail td {
+  padding: 5px 8px;
+  border-top: 1px solid var(--border);
+}
+
+.consumption-detail td:first-child {
+  width: 1%;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.consumption-detail td:last-child {
+  width: 1%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.consumption-unused {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.consumption-note {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}

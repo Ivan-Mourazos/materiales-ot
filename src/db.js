@@ -1,6 +1,7 @@
 import sql from 'mssql';
 import { config } from './config.js';
 import { orderKey, pieceFromOrderLine, toDottedOrderCode, toRpsOfCode } from './orders.js';
+import { buildConsumption } from './consumption.js';
 
 let poolPromise;
 
@@ -391,6 +392,56 @@ export async function getOrderOfs(orderCode) {
       article: row.article ? String(row.article).trim() : null,
       comment: row.lineComment ? String(row.lineComment).replace(/\s+/g, ' ').trim().slice(0, 400) : null
     }))
+  };
+}
+
+// Despiece real de un pedido: lo imputado a cada OF y lo que se reservó, para compararlo
+// (ver src/consumption.js). Solo lectura.
+export async function getOrderConsumption(orderCode, { fixTransfers = true } = {}) {
+  const { order, ofs } = await getOrderOfs(orderCode);
+  if (!order) return { order: null, ...buildConsumption({ ofs: [], imputed: [], reserved: [] }) };
+
+  const pool = await getPool();
+  const query = (sqlText) => {
+    const request = pool.request();
+    request.input('company', sql.VarChar(10), config.db.company);
+    request.input('order', sql.VarChar(40), order);
+    return request.query(sqlText);
+  };
+
+  const [imputed, reserved] = await Promise.all([
+    query(`
+      SELECT m.CodManufacturingOrder AS ofCode, a.CodArticle AS code, a.Description AS description,
+        SUM(i.Quantity) AS quantity
+      FROM dbo.CPRImputationMaterialMO i
+      JOIN dbo.CPRManufacturingOrder m ON m.IDManufacturingOrder = i.IDManufacturingOrder
+      JOIN dbo.STKArticle a ON a.IDArticle = i.IDArticle
+      WHERE m.CodCompany = @company AND m.InternalCode = @order
+      GROUP BY m.CodManufacturingOrder, a.CodArticle, a.Description;
+    `),
+    query(`
+      SELECT m.CodManufacturingOrder AS ofCode, a.CodArticle AS code, a.Description AS description,
+        SUM(mm.Quantity) AS quantity
+      FROM dbo.CPRMOMaterial mm
+      JOIN dbo.CPRMOTask t ON t.IDMOTask = mm.IDMOTask
+      JOIN dbo.CPRManufacturingOrder m ON m.IDManufacturingOrder = t.IDManufacturingOrder
+      JOIN dbo.STKArticle a ON a.IDArticle = mm.IDArticle
+      WHERE m.CodCompany = @company AND m.InternalCode = @order
+      GROUP BY m.CodManufacturingOrder, a.CodArticle, a.Description;
+    `)
+  ]);
+
+  const toRows = (result) =>
+    result.recordset.map((row) => ({
+      of: String(row.ofCode).trim(),
+      code: String(row.code).trim(),
+      description: String(row.description || '').trim(),
+      quantity: Number(row.quantity) || 0
+    }));
+
+  return {
+    order,
+    ...buildConsumption({ ofs, imputed: toRows(imputed), reserved: toRows(reserved), fixTransfers })
   };
 }
 
