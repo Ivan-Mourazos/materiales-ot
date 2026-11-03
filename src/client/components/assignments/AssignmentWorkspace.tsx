@@ -2,6 +2,7 @@ import { FileClock, Save, X } from 'lucide-react';
 import type { Article, OfBlock } from '../../types';
 import type { Quantity, QuantityInput } from '../../quantities';
 import { OfCard } from './OfCard';
+import type { DropPosition } from '../../reorder';
 import { SummaryPanel } from './SummaryPanel';
 
 export function AssignmentWorkspace({
@@ -29,7 +30,11 @@ export function AssignmentWorkspace({
   onRemoveOf,
   onAddLine,
   onRemoveLine,
-  onUpdateLineQuantity
+  onUpdateLineQuantity,
+  onMoveOf,
+  onMoveOfBy,
+  onMoveLine,
+  onMoveLineBy
 }: {
   orderCode: string;
   setOrderCode: (value: string) => void;
@@ -56,6 +61,10 @@ export function AssignmentWorkspace({
   onAddLine: (ofId: string, article: Article, quantity: QuantityInput) => boolean;
   onRemoveLine: (ofId: string, lineId: string) => void;
   onUpdateLineQuantity: (ofId: string, lineId: string, quantity: Quantity) => void;
+  onMoveOf: (ofId: string, targetOfId: string, position: DropPosition) => void;
+  onMoveOfBy: (ofId: string, delta: -1 | 1) => void;
+  onMoveLine: (lineId: string, targetOfId: string, targetLineId: string | null, position: DropPosition) => void;
+  onMoveLineBy: (lineId: string, delta: -1 | 1) => void;
 }) {
   return (
     <section className="workspace view" key="assignments">
@@ -132,6 +141,10 @@ export function AssignmentWorkspace({
             onAddLine={onAddLine}
             onRemoveLine={onRemoveLine}
             onUpdateLineQuantity={onUpdateLineQuantity}
+            onMoveOf={onMoveOf}
+            onMoveOfBy={onMoveOfBy}
+            onMoveLine={onMoveLine}
+            onMoveLineBy={onMoveLineBy}
           />
         ))}
       </section>

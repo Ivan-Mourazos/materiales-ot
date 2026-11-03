@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { GripVertical, Trash2 } from 'lucide-react';
+import { draggingItem, dropPositionFor, endDrag, startDrag } from '../../dragState';
+import type { DropPosition } from '../../reorder';
 import { ArticleThumb } from '../common/ArticleThumb';
 import type { OfBlock } from '../../types';
 import { formatDisplayText } from '../../utils';
@@ -8,17 +10,28 @@ import { hasQuantity, parseQuantityInput, quantityInputValue, type Quantity } fr
 export function MaterialTable({
   ofBlock,
   onRemoveLine,
-  onUpdateQuantity
+  onUpdateQuantity,
+  onMoveLine,
+  onMoveLineBy
 }: {
   ofBlock: OfBlock;
   onRemoveLine: (ofId: string, lineId: string) => void;
   onUpdateQuantity: (lineId: string, quantity: Quantity) => void;
+  /** Soltar un material delante o detrás de `targetLineId` (de esta OF o de otra). */
+  onMoveLine: (lineId: string, targetOfId: string, targetLineId: string | null, position: DropPosition) => void;
+  /** Subir o bajar un material con las flechas del teclado. */
+  onMoveLineBy: (lineId: string, delta: -1 | 1) => void;
 }) {
+  // Dónde caería el material que se arrastra: fila y si va delante o detrás
+  const [dropMark, setDropMark] = useState<{ lineId: string; position: DropPosition } | null>(null);
+  const handleRefs = useRef(new Map<string, HTMLButtonElement>());
+
   return (
     <div className="materials-table-wrap">
       <table className="materials-table">
         <thead>
           <tr>
+            <th aria-label="Ordenar" className="drag-col" />
             <th>Artículo</th>
             <th>Descripción</th>
             <th>Ancho</th>
@@ -29,13 +42,64 @@ export function MaterialTable({
         <tbody>
           {ofBlock.materials.length === 0 ? (
             <tr>
-              <td className="empty-row" colSpan={5}>
+              <td className="empty-row" colSpan={6}>
                 Sin materiales todavía en esta OF.
               </td>
             </tr>
           ) : (
             ofBlock.materials.map((line) => (
-              <tr key={line.id}>
+              <tr
+                key={line.id}
+                className={dropMark?.lineId === line.id ? `drop-${dropMark.position}` : undefined}
+                onDragOver={(event) => {
+                  const item = draggingItem();
+                  if (item?.type !== 'line' || item.lineId === line.id) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  event.dataTransfer.dropEffect = 'move';
+                  const position = dropPositionFor(event, event.currentTarget);
+                  setDropMark((mark) => (mark?.lineId === line.id && mark.position === position ? mark : { lineId: line.id, position }));
+                }}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropMark(null);
+                }}
+                onDrop={(event) => {
+                  const item = draggingItem();
+                  setDropMark(null);
+                  if (item?.type !== 'line') return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onMoveLine(item.lineId, ofBlock.id, line.id, dropPositionFor(event, event.currentTarget));
+                  endDrag();
+                }}
+              >
+                <td className="drag-col">
+                  <button
+                    ref={(element) => {
+                      if (element) handleRefs.current.set(line.id, element);
+                      else handleRefs.current.delete(line.id);
+                    }}
+                    className="drag-handle"
+                    type="button"
+                    draggable
+                    onDragStart={(event) => startDrag(event, { type: 'line', ofId: ofBlock.id, lineId: line.id }, event.currentTarget.closest('tr'))}
+                    onDragEnd={() => {
+                      endDrag();
+                      setDropMark(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+                      event.preventDefault();
+                      onMoveLineBy(line.id, event.key === 'ArrowUp' ? -1 : 1);
+                      // Al mover la fila el navegador puede quitarle el foco: se le devuelve
+                      requestAnimationFrame(() => handleRefs.current.get(line.id)?.focus());
+                    }}
+                    aria-label={`Mover ${line.code}. Arrastra o usa las flechas arriba y abajo`}
+                    title="Arrastra para ordenar (o pasar a otra OF). Con el teclado: flechas arriba y abajo"
+                  >
+                    <GripVertical aria-hidden="true" />
+                  </button>
+                </td>
                 <td>
                   <span className="material-code">
                     <ArticleThumb key={line.code} code={line.code} />

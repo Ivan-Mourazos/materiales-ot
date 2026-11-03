@@ -83,7 +83,7 @@ select:focus-visible {
 
 /* Códigos de artículo, OF y pedido en Geist Mono, como los «AR.26…» de CoordinaOT */
 .catalog-reference strong,
-.materials-table td:first-child:not([colspan]),
+.materials-table td:nth-child(2):not([colspan]),
 .material-pill,
 .missing-item-code,
 .draft-order-tag,

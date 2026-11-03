@@ -20,6 +20,7 @@ import type {
 import { roundQuantity, uid } from './utils';
 import { mergeOrderOfs, type RpsOrderOf } from './orderOfs';
 import { iniciarPildoras } from './pildoraDeslizante';
+import { moveLine, moveLineBy, moveOf, moveOfBy } from './reorder';
 import { describeActiveModel } from './activeModel';
 import {
   addQuantities,
@@ -51,6 +52,7 @@ import { useTheme } from './hooks/useTheme';
 import { useToasts } from './hooks/useToasts';
 import { getUserName, instalarCabeceraUsuario, setUserName } from './currentUser';
 import { WhoAreYouDialog } from './components/common/WhoAreYouDialog';
+import { ReuseHistoryModal } from './components/history/ReuseHistoryModal';
 
 const storageKey = 'materiales-ot-state-v3';
 
@@ -100,6 +102,7 @@ function App() {
   const [ofWarningsPrompt, setOfWarningsPrompt] = useState<string[] | null>(null);
   const [isImportingOfs, setIsImportingOfs] = useState(false);
   const [isCopyConsumptionOpen, setIsCopyConsumptionOpen] = useState(false);
+  const [reuseEntry, setReuseEntry] = useState<HistoryEntry | null>(null);
   // Lo ya confirmado en este intento de generar: al aceptar el siguiente aviso no se vuelve a preguntar.
   const lastSaveConfirmations = useRef({ confirmOverwrite: false, confirmOfs: false });
   const [missingQuantities, setMissingQuantities] = useState<MissingQuantity[] | null>(null);
@@ -268,27 +271,26 @@ function App() {
     setOfs((current) => current.map((item) => (item.id === id ? { ...item, description } : item)));
   }
 
+  // Reutilizar del historial: abre el diálogo para elegir OFs y materiales (ReuseHistoryModal)
   function reuseReservation(entry: HistoryEntry) {
-    const clones: OfBlock[] = entry.ofs.map((ofBlock) => ({
-      id: uid(),
-      of: '',
-      description: ofBlock.description || '',
-      materials: ofBlock.materials.map((line) => ({
-        id: uid(),
-        code: line.code,
-        description: line.description || '',
-        quantity: line.quantity,
-        width: null,
-        widthWarning: null
-      }))
-    }));
+    setReuseEntry(entry);
+  }
 
+  function applyReusedOfs(picked: OfBlock[], replaceExisting: boolean) {
+    const previous = ofs;
     setOfs((current) => {
+      if (replaceExisting) return picked;
       const rest = current.filter((ofBlock) => ofBlock.of.trim() || ofBlock.materials.length > 0);
-      return [...rest, ...clones];
+      return [...rest, ...picked];
     });
+    setReuseEntry(null);
     setActiveTab('assignments');
-    pushToast('Materiales cargados desde el historial. Escribe las nuevas OFs y el pedido.', 'info');
+    const lines = picked.reduce((sum, block) => sum + block.materials.length, 0);
+    pushToast(
+      `${picked.length === 1 ? '1 OF' : `${picked.length} OFs`} y ${lines} líneas cargadas del historial. Escribe las nuevas OFs y el pedido.`,
+      'info',
+      { label: 'Deshacer', run: () => setOfs(previous) }
+    );
   }
 
   // Un borrador o modelo abierto aquí se ha guardado desde su pestaña. Sin esto, el siguiente
@@ -870,6 +872,12 @@ function App() {
           onAddLine={addLine}
           onRemoveLine={removeLine}
           onUpdateLineQuantity={updateLineQuantity}
+          onMoveOf={(ofId, targetOfId, position) => setOfs((current) => moveOf(current, ofId, targetOfId, position))}
+          onMoveOfBy={(ofId, delta) => setOfs((current) => moveOfBy(current, ofId, delta))}
+          onMoveLine={(lineId, targetOfId, targetLineId, position) =>
+            setOfs((current) => moveLine(current, lineId, targetOfId, targetLineId, position))
+          }
+          onMoveLineBy={(lineId, delta) => setOfs((current) => moveLineBy(current, lineId, delta))}
         />
       )}
 
@@ -914,6 +922,10 @@ function App() {
           onClose={() => setIsSaveDraftOpen(false)}
           onSave={handleSaveDraftModal}
         />
+      )}
+
+      {reuseEntry && (
+        <ReuseHistoryModal entry={reuseEntry} onClose={() => setReuseEntry(null)} onReuse={applyReusedOfs} />
       )}
 
       {isCopyConsumptionOpen && (

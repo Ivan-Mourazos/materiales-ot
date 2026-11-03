@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
-import { AlertTriangle, PackagePlus, Trash2 } from 'lucide-react';
+import { AlertTriangle, GripVertical, PackagePlus, Trash2 } from 'lucide-react';
+import { draggingItem, dropPositionFor, endDrag, startDrag } from '../../dragState';
+import type { DropPosition } from '../../reorder';
 import type { Article, OfBlock } from '../../types';
 import { formatDisplayText } from '../../utils';
 import { parseQuantityInput, type Quantity, type QuantityInput } from '../../quantities';
@@ -15,7 +17,11 @@ export function OfCard({
   onRemoveOf,
   onAddLine,
   onRemoveLine,
-  onUpdateLineQuantity
+  onUpdateLineQuantity,
+  onMoveOf,
+  onMoveOfBy,
+  onMoveLine,
+  onMoveLineBy
 }: {
   index: number;
   ofBlock: OfBlock;
@@ -26,7 +32,15 @@ export function OfCard({
   onAddLine: (ofId: string, article: Article, quantity: QuantityInput) => boolean;
   onRemoveLine: (ofId: string, lineId: string) => void;
   onUpdateLineQuantity: (ofId: string, lineId: string, quantity: Quantity) => void;
+  onMoveOf: (ofId: string, targetOfId: string, position: DropPosition) => void;
+  onMoveOfBy: (ofId: string, delta: -1 | 1) => void;
+  onMoveLine: (lineId: string, targetOfId: string, targetLineId: string | null, position: DropPosition) => void;
+  onMoveLineBy: (lineId: string, delta: -1 | 1) => void;
 }) {
+  const cardRef = useRef<HTMLElement>(null);
+  const handleRef = useRef<HTMLButtonElement>(null);
+  // Marca de dónde caería lo que se arrastra: otra OF delante/detrás, o un material al final de esta
+  const [dropMark, setDropMark] = useState<DropPosition | 'inside' | null>(null);
   const [quantity, setQuantity] = useState('');
   const quantityRef = useRef<HTMLInputElement>(null);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
@@ -50,8 +64,53 @@ export function OfCard({
   }
 
   return (
-    <article className={`of-card ${isDuplicate ? 'duplicate' : ''}`}>
+    <article
+      ref={cardRef}
+      className={`of-card ${isDuplicate ? 'duplicate' : ''}${dropMark ? ` drop-${dropMark}` : ''}`}
+      onDragOver={(event) => {
+        const item = draggingItem();
+        if (!item) return;
+        if (item.type === 'of' && item.ofId === ofBlock.id) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        const mark = item.type === 'of' ? dropPositionFor(event, event.currentTarget) : 'inside';
+        setDropMark((current) => (current === mark ? current : mark));
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropMark(null);
+      }}
+      onDrop={(event) => {
+        const item = draggingItem();
+        setDropMark(null);
+        if (!item) return;
+        event.preventDefault();
+        if (item.type === 'of') onMoveOf(item.ofId, ofBlock.id, dropPositionFor(event, event.currentTarget));
+        else onMoveLine(item.lineId, ofBlock.id, null, 'after');
+        endDrag();
+      }}
+    >
       <div className="of-header">
+        <button
+          ref={handleRef}
+          className="drag-handle of-drag-handle"
+          type="button"
+          draggable
+          onDragStart={(event) => startDrag(event, { type: 'of', ofId: ofBlock.id }, cardRef.current)}
+          onDragEnd={() => {
+            endDrag();
+            setDropMark(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+            event.preventDefault();
+            onMoveOfBy(ofBlock.id, event.key === 'ArrowUp' ? -1 : 1);
+            requestAnimationFrame(() => handleRef.current?.focus());
+          }}
+          aria-label={`Mover la OF ${ofBlock.of || index + 1}. Arrastra o usa las flechas arriba y abajo`}
+          title="Arrastra para cambiar el orden de las OFs. Con el teclado: flechas arriba y abajo"
+        >
+          <GripVertical aria-hidden="true" />
+        </button>
         <label className="field of-number">
           <span>OF {index + 1}</span>
           <input
@@ -136,6 +195,8 @@ export function OfCard({
         ofBlock={ofBlock}
         onRemoveLine={onRemoveLine}
         onUpdateQuantity={(lineId, value) => onUpdateLineQuantity(ofBlock.id, lineId, value)}
+        onMoveLine={onMoveLine}
+        onMoveLineBy={onMoveLineBy}
       />
     </article>
   );

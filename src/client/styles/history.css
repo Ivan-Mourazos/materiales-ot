@@ -287,3 +287,110 @@
   color: var(--ink-3);
   font-size: 13px;
 }
+
+/* ── Reutilizar del historial (ReuseHistoryModal.tsx): OFs con sus materiales, cada uno con casilla ── */
+.model-dialog .reuse-history-modal {
+  width: min(900px, 100%);
+}
+.reuse-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.reuse-of {
+  border-radius: var(--radius-m);
+  background: var(--zone);
+}
+.reuse-of.is-off .reuse-of-toggle {
+  opacity: 0.55;
+}
+.reuse-of-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 12px;
+}
+.reuse-of-check,
+.reuse-lines input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-brand-500);
+  cursor: pointer;
+}
+.reuse-of-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px 10px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+.reuse-of-toggle strong {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reuse-of-toggle > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--ink-3);
+  transition: transform 160ms ease;
+}
+.reuse-of-toggle[aria-expanded='true'] > svg {
+  transform: rotate(180deg);
+}
+.reuse-count {
+  color: var(--ink-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.reuse-lines {
+  display: grid;
+  margin: 0;
+  padding: 0 12px 10px 40px;
+  list-style: none;
+}
+.reuse-lines label {
+  display: grid;
+  grid-template-columns: 16px 30px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.reuse-lines .article-thumb {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+.reuse-lines label:has(input:not(:checked)) {
+  color: var(--ink-3);
+}
+.reuse-code {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.reuse-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reuse-qty {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

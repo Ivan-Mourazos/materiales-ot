@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Database, Folder, Moon, Sun, UserRound } from 'lucide-react';
 import { personaDe, tintaSobre } from '../personas';
+import { QuickStockButton } from './catalog/QuickStock';
 import type { ConnectionState } from '../types';
 
 const statusLabels: Record<'database' | 'network', Record<ConnectionState, string>> = {
@@ -35,6 +36,7 @@ export function Header({
       </div>
       {navigation}
       <div className="cabecera-derecha">
+        <QuickStockButton />
         <button
           type="button"
           className="estado-chip glass-chip usuario-chip"

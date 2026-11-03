@@ -161,12 +161,12 @@ input:is([type='checkbox'], [type='radio']) {
 }
 
 .of-header {
-  grid-template-columns: minmax(130px, 190px) minmax(0, 1fr) 38px;
+  grid-template-columns: 28px minmax(130px, 190px) minmax(0, 1fr) 38px;
   margin-bottom: 14px;
 }
 
 .of-header .icon-button {
-  grid-column: 3;
+  grid-column: 4;
 }
 
 .duplicate-hint {
@@ -400,18 +400,18 @@ input:is([type='checkbox'], [type='radio']) {
   letter-spacing: 0.01em;
 }
 
-.materials-table th:nth-child(1) {
+.materials-table th:nth-child(2) {
   width: 180px;
-}
-
-.materials-table th:nth-child(3),
-.materials-table td:nth-child(3) {
-  width: 78px;
-  text-align: right;
 }
 
 .materials-table th:nth-child(4),
 .materials-table td:nth-child(4) {
+  width: 78px;
+  text-align: right;
+}
+
+.materials-table th:nth-child(5),
+.materials-table td:nth-child(5) {
   width: 110px;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -438,7 +438,7 @@ input:is([type='checkbox'], [type='radio']) {
   background: var(--input-bg);
 }
 
-.materials-table th:nth-child(5) {
+.materials-table th:nth-child(6) {
   width: 48px;
 }
 
@@ -485,3 +485,76 @@ input:is([type='checkbox'], [type='radio']) {
   border-radius: var(--radius-s);
 }
 
+
+/* ── Ordenar OFs y materiales a mano (reorder.ts, dragState.ts) ──
+   Asa ⋮⋮ para arrastrar (o flechas del teclado) y una raya dorada donde caería. */
+.drag-handle {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: grab;
+  opacity: 0.55;
+  transition: opacity 120ms ease, background-color 120ms ease;
+}
+.drag-handle svg {
+  width: 16px;
+  height: 16px;
+}
+.drag-handle:hover,
+.drag-handle:focus-visible {
+  background: var(--surface-2);
+  color: var(--ink);
+  opacity: 1;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.of-drag-handle {
+  align-self: end;
+  height: 40px;
+}
+.materials-table th.drag-col,
+.materials-table td.drag-col {
+  width: 28px;
+  padding-right: 0;
+}
+.materials-table tbody tr:hover .drag-handle {
+  opacity: 1;
+}
+/* Dónde caería un material: raya encima o debajo de la fila */
+.materials-table tbody tr.drop-before td {
+  box-shadow: inset 0 2px 0 var(--color-brand-500);
+}
+.materials-table tbody tr.drop-after td {
+  box-shadow: inset 0 -2px 0 var(--color-brand-500);
+}
+/* Dónde caería una OF: raya delante o detrás de la tarjeta; un material soltado en otra OF, borde */
+.of-card {
+  position: relative;
+}
+.of-card.drop-before::before,
+.of-card.drop-after::after {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--color-brand-500);
+  content: '';
+}
+.of-card.drop-before::before {
+  top: -9px;
+}
+.of-card.drop-after::after {
+  bottom: -9px;
+}
+.of-card.drop-inside {
+  outline: 2px dashed var(--color-brand-500);
+  outline-offset: 2px;
+}
