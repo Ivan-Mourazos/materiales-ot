@@ -2,6 +2,7 @@ import sql from 'mssql';
 import { config } from './config.js';
 import { orderKey, pieceFromOrderLine, toDottedOrderCode, toRpsOfCode } from './orders.js';
 import { buildConsumption } from './consumption.js';
+import { detectWidth } from './width.js';
 
 let poolPromise;
 
@@ -139,53 +140,6 @@ function buildTokenConditions(searchableText, tokens) {
       .map((_, index) => `${searchableText} LIKE @token${index} ESCAPE '\\'`)
       .join('\n        AND ')
     : '1 = 0';
-}
-
-function detectWidth(row) {
-  const candidates = [];
-  const pushWidth = (source, value) => {
-    const width = Number(String(value).replace(',', '.'));
-    if (Number.isFinite(width) && width >= 40 && width <= 600) {
-      candidates.push({ source, width });
-    }
-  };
-
-  const unitText = `${row.unitCode || ''} ${row.unitDescription || ''}`;
-  for (const match of unitText.matchAll(/\b(?:ML|ANCHO(?:\s+DE\s+PIEZA)?)\s*[:=-]?\s*(\d{2,3}(?:[,.]\d+)?)\b/gi)) {
-    pushWidth('unidad', match[1]);
-  }
-
-  const codeText = String(row.code || '');
-  for (const match of codeText.matchAll(/\bP\s*(\d{2,3}(?:[,.]\d+)?)\b/gi)) {
-    pushWidth('referencia', match[1]);
-  }
-
-  const descriptionText = String(row.description || '');
-  for (const match of descriptionText.matchAll(/(?::|\bAN(?:CHO)?\b)\s*(\d{2,3}(?:[,.]\d+)?)\b|\b(\d{2,3}(?:[,.]\d+)?)\s*(?:CM)?\s*AN\b/gi)) {
-    pushWidth('descripcion', match[1] || match[2]);
-  }
-
-  if (candidates.length === 0) {
-    return { detectedWidth: null, widthWarning: null };
-  }
-
-  // La unidad de ficha es el valor operativo de referencia. La descripción y
-  // el código se contrastan para avisar de posibles discrepancias.
-  const orderedSources = ['unidad', 'referencia', 'descripcion'];
-  const chosen = orderedSources
-    .map((source) => candidates.find((item) => item.source === source))
-    .find(Boolean) || candidates[0];
-  const uniqueWidths = Array.from(new Set(candidates.map((item) => item.width)));
-  const uniqueCandidates = Array.from(
-    new Map(candidates.map((item) => [`${item.source}::${item.width}`, item])).values()
-  );
-
-  return {
-    detectedWidth: chosen.width,
-    widthWarning: uniqueWidths.length > 1
-      ? `Conflicto de ancho: ${uniqueCandidates.map((item) => `${item.source} ${item.width} cm`).join(', ')}. Se muestra el ancho de la unidad de ficha.`
-      : null
-  };
 }
 
 function mapArticle(row) {
