@@ -1,0 +1,361 @@
+/* ============================================================
+   Estilo «Hero» de CoordinaOT y Planteamientos (Iván, 26/10/2026)
+   Guía: coordina-ot/docs/ESTILO-HEROUI.md. Referencia aprobada:
+   toldos-testar/src/client/coordina/hero.css y pildoraDeslizante.ts.
+
+   Fondo gris liso, paneles blancos sin borde y muy redondeados,
+   botones en píldora sin borde (principal macizo en el dorado TGM,
+   secundarios grises), un pequeño encogimiento al pulsar, campos
+   blancos con una sombra mínima y pestañas en un carril gris con la
+   elegida en píldora blanca que se desliza.
+
+   Se activa con `data-estilo="hero"` en <html> (index.html). Sin ese
+   atributo la web vuelve al acabado metálico anterior. Primero se
+   redefinen las variables que ya usan todas las piezas; después, lo
+   que no se arregla solo con variables. Nada de !important.
+   ============================================================ */
+
+html[data-estilo='hero'] {
+  --hero-fondo: #f4f4f5;
+  --hero-superficie: #ffffff;
+  --hero-relleno: #e9e9ec;
+  --hero-relleno-encima: #dedee3;
+  --hero-relleno-pulsado: #d4d4da;
+  --hero-carril: #e9e9ec;
+  --hero-pildora: #ffffff;
+  --hero-zona: #eeeef1;
+  --hero-texto-suave: #52525b;
+  --hero-sombra-panel: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px -14px rgba(0, 0, 0, 0.12);
+  --hero-sombra-campo: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --hero-sombra-pildora: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --hero-sombra-flota: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 18px 40px -14px rgba(0, 0, 0, 0.3);
+  --hero-sombra-dialogo: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 30px 80px -24px rgba(0, 0, 0, 0.45);
+  --hero-anillo: var(--color-brand-500);
+
+  /* Variables de siempre → acabado Hero */
+  --bg: var(--hero-fondo);
+  --bg-glow: var(--hero-fondo);
+  --surface: var(--hero-superficie);
+  --surface-2: #f4f4f5;
+  --zone: var(--hero-zona);
+  --border: #e4e4e7;
+  --text: #18181b;
+  --text-muted: var(--hero-texto-suave);
+  --focus-ring: var(--hero-anillo);
+
+  --glass-bg: var(--hero-superficie);
+  --glass-bg-strong: var(--hero-superficie);
+  --glass-bg-pop: var(--hero-superficie);
+  --glass-chip: var(--hero-superficie);
+  --glass-border: transparent;
+
+  --panel-bg: var(--hero-superficie);
+  --panel-shadow: var(--hero-sombra-panel);
+  --dialog-shadow: var(--hero-sombra-dialogo);
+  --chip-bg: var(--hero-relleno);
+  --chip-shadow: none;
+  --chip-shadow-hover: none;
+  --key-shadow: none;
+  --key-shadow-hover: none;
+  --key-shadow-pressed: none;
+  --solid-shadow: none;
+  --solid-shadow-hover: none;
+  --solid-shadow-pressed: none;
+  --active-bg: var(--hero-pildora);
+  --active-shadow: var(--hero-sombra-pildora);
+  --pop-shadow: var(--hero-sombra-flota);
+  --input-bg: var(--hero-superficie);
+  /* Lo resaltado (opción del buscador, fila elegida) sigue en tinte dorado, no en la píldora blanca */
+  --accent-soft: color-mix(in srgb, var(--color-brand-400) 16%, transparent);
+
+  --radius-s: 10px;
+  --radius-m: 12px;
+  --radius-l: 14px;
+}
+
+/* Oscuro carbón, no negro (Iván, 26/10/2026: «el modo oscuro se me hace demasiado negro el fondo») */
+html[data-estilo='hero'][data-theme='dark'] {
+  --hero-fondo: #161618;
+  --hero-superficie: #202024;
+  --hero-relleno: #303036;
+  --hero-relleno-encima: #3a3a41;
+  --hero-relleno-pulsado: #44444c;
+  --hero-carril: #2b2b30;
+  /* En oscuro la elegida va más clara que el carril; si no, apenas se ve */
+  --hero-pildora: #5a5a63;
+  --hero-zona: #29292e;
+  --hero-texto-suave: #a1a1aa;
+  --hero-sombra-panel: 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --hero-sombra-campo: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --hero-sombra-pildora: 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  --hero-sombra-flota: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 40px -14px rgba(0, 0, 0, 0.8);
+  --hero-sombra-dialogo: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 30px 80px -24px rgba(0, 0, 0, 0.85);
+  --hero-anillo: var(--color-brand-400);
+
+  --surface-2: #27272a;
+  --border: #303036;
+  --border-strong: #45454d;
+  --text: #fafafa;
+
+  /* `:root[data-theme='dark']` de tokens.css pesa más que `html[data-estilo='hero']`:
+     en oscuro hay que volver a decir aquí todo lo que ese bloque redefine. */
+  --bg: var(--hero-fondo);
+  --bg-glow: var(--hero-fondo);
+  --surface: var(--hero-superficie);
+  --zone: var(--hero-zona);
+  --text-muted: var(--hero-texto-suave);
+  --glass-bg: var(--hero-superficie);
+  --glass-bg-strong: var(--hero-superficie);
+  --glass-bg-pop: var(--hero-superficie);
+  --glass-chip: var(--hero-superficie);
+  --glass-border: transparent;
+  --chip-shadow: none;
+  --chip-shadow-hover: none;
+  --key-shadow: none;
+  --key-shadow-hover: none;
+  --key-shadow-pressed: none;
+  --solid-shadow: none;
+  --solid-shadow-hover: none;
+  --active-bg: var(--hero-pildora);
+  --active-shadow: var(--hero-sombra-pildora);
+  --pop-shadow: var(--hero-sombra-flota);
+  --focus-ring: var(--hero-anillo);
+}
+
+/* ── Fondo liso ── */
+html[data-estilo='hero'] .glass-header {
+  background: var(--hero-fondo);
+  backdrop-filter: none;
+}
+
+/* ── Paneles y tarjetas: blancos, sin borde, muy redondeados ── */
+html[data-estilo='hero'] :is(.summary-panel, .of-card, .catalog-panel, .catalog-table-wrap, .model-card, .draft-card, .history-card) {
+  border-radius: 14px;
+}
+/* Lo de dentro de un panel no lleva otra tarjeta encima: gris de zona y sin borde */
+html[data-estilo='hero'] :is(.metric-box, .active-draft-banner) {
+  background: var(--hero-zona);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* ── Campos: blancos, sin borde, sombra mínima; foco de 2 px en dorado ── */
+html[data-estilo='hero'] :is(input:not([type='checkbox']):not([type='radio']):not(.quantity-cell-input), select, textarea),
+html[data-estilo='hero'] :is(.apple-select-trigger, .drafts-search-box, .models-search-box) {
+  background-color: var(--hero-superficie);
+  border-color: transparent;
+  border-radius: 10px;
+  box-shadow: var(--hero-sombra-campo);
+  transition: box-shadow 150ms ease;
+}
+html[data-estilo='hero'] :is(input:not([type='checkbox']):not([type='radio']):not(.quantity-cell-input), select, textarea):focus,
+html[data-estilo='hero'] :is(.apple-select-trigger.open, .drafts-search-box:focus-within, .models-search-box:focus-within) {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--hero-anillo);
+}
+/* El buscador con caja: el anillo va en la caja, no también en el campo de dentro */
+html[data-estilo='hero'] :is(.drafts-search-box, .models-search-box) input:not([type='checkbox']):not([type='radio']):not(.quantity-cell-input),
+html[data-estilo='hero'] :is(.drafts-search-box, .models-search-box) input:not([type='checkbox']):not([type='radio']):not(.quantity-cell-input):focus {
+  background: transparent;
+  box-shadow: none;
+}
+html[data-estilo='hero'] .apple-select-trigger:hover:not(:disabled) {
+  border-color: transparent;
+  box-shadow: var(--hero-sombra-campo), 0 0 0 1px var(--hero-relleno-encima);
+}
+/* Cantidad de cada línea: se edita en la tabla, así que se ve como un campo (sin borde, con la sombra de campo) */
+html[data-estilo='hero'] .quantity-cell-input:not(.quantity-missing),
+html[data-estilo='hero'] .quantity-cell-input:not(.quantity-missing):hover {
+  background-color: var(--hero-superficie);
+  border-color: transparent;
+  border-radius: 10px;
+  box-shadow: var(--hero-sombra-campo);
+}
+html[data-estilo='hero'] .quantity-cell-input:focus,
+html[data-estilo='hero'] .quantity-cell-input:focus:hover {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--hero-anillo);
+}
+
+/* ── Botones: píldoras sin borde. Principal macizo en dorado; secundarios grises ── */
+html[data-estilo='hero'] :is(.button, .row-add-button, .draft-resume-button, .icon-button, .estado-chip, .cabecera-modo, .category-pill, .library-count) {
+  border-color: transparent;
+  border-radius: 999px;
+  box-shadow: none;
+  transition: transform 200ms cubic-bezier(0.2, 0, 0, 1), background-color 120ms ease, color 120ms ease, box-shadow 150ms ease;
+}
+html[data-estilo='hero'] :is(.button-muted, .button-ghost, .icon-button, .estado-chip, .cabecera-modo, .category-pill, .library-count) {
+  background: var(--hero-relleno);
+}
+html[data-estilo='hero'] .button-muted { color: var(--text); }
+html[data-estilo='hero'] :is(.button-muted, .button-ghost, .icon-button, .cabecera-modo, .category-pill):hover:not(:disabled) {
+  background: var(--hero-relleno-encima);
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}
+html[data-estilo='hero'] :is(.button-primary, .button-secondary, .row-add-button, .draft-resume-button) {
+  background: var(--color-brand-400);
+  color: var(--on-accent);
+}
+html[data-estilo='hero'] :is(.button-primary, .button-secondary, .row-add-button, .draft-resume-button):hover:not(:disabled) {
+  background: var(--color-brand-500);
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}
+html[data-estilo='hero'] .button-danger:hover:not(:disabled) {
+  box-shadow: none;
+  transform: none;
+}
+/* Al pulsar, se encoge un poco, como en HeroUI; no sube ni se hunde */
+html[data-estilo='hero'] :is(.button, .row-add-button, .draft-resume-button, .icon-button, .cabecera-modo, .category-pill, .pestana):active:not(:disabled) {
+  box-shadow: none;
+  transform: scale(0.97);
+}
+html[data-estilo='hero'] :is(.button-muted, .button-ghost, .icon-button, .cabecera-modo, .category-pill):active:not(:disabled) {
+  background: var(--hero-relleno-pulsado);
+}
+/* El chip de estado (BD, carpeta) es informativo: no reacciona al pasar el ratón */
+html[data-estilo='hero'] .estado-chip:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+/* ── Pestañas: carril gris en píldora; la elegida, píldora blanca con sombra ── */
+html[data-estilo='hero'] .tira-3d {
+  background: var(--hero-carril);
+  border-radius: 999px;
+  gap: 2px;
+  padding: 4px;
+}
+html[data-estilo='hero'] .tira-3d > :not(.pestana-activa),
+html[data-estilo='hero'] .tira-3d > :not(.pestana-activa):hover,
+html[data-estilo='hero'] .tira-3d > :not(.pestana-activa):active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+html[data-estilo='hero'] .tira-3d > :not(.pestana-activa):hover { color: var(--text); transform: none; }
+html[data-estilo='hero'] .pestana { border: 0; border-radius: 999px; height: 2rem; }
+html[data-estilo='hero'] .pestana-activa {
+  background: var(--hero-pildora);
+  border: 0;
+  box-shadow: var(--hero-sombra-pildora);
+  color: var(--text);
+  transform: none;
+}
+html[data-estilo='hero'] .pestana-activa .pestana-contador {
+  background: var(--color-brand-400);
+  color: var(--on-accent);
+}
+/* La categoría elegida en Modelos, también como píldora clara */
+html[data-estilo='hero'] .category-pill.active,
+html[data-estilo='hero'] .category-pill.active:hover {
+  background: var(--hero-pildora);
+  box-shadow: var(--hero-sombra-pildora);
+  color: var(--text);
+  transform: none;
+}
+
+/* La píldora que se desliza (pildoraDeslizante.ts): con data-pildora, el fondo de la elegida lo
+   pinta el ::before del contenedor, que se mueve de una opción a otra. Sin JavaScript, cada
+   elegida conserva su propio fondo. */
+html[data-estilo='hero'] .tira-3d[data-pildora] {
+  isolation: isolate;
+  position: relative;
+}
+html[data-estilo='hero'] .tira-3d[data-pildora]::before {
+  background: var(--hero-pildora);
+  border-radius: 999px;
+  box-shadow: var(--hero-sombra-pildora);
+  content: '';
+  height: var(--ph);
+  left: 0;
+  position: absolute;
+  top: 0;
+  transform: translate(var(--px), var(--py));
+  width: var(--pw);
+  z-index: -1;
+}
+html[data-estilo='hero'] .tira-3d[data-pildora='lista']::before {
+  transition:
+    transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+html[data-estilo='hero'] .tira-3d[data-pildora] > .pestana-activa {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ── Foco de teclado visible en todo lo que se pulsa ── */
+html[data-estilo='hero'] :is(.button, .row-add-button, .draft-resume-button, .icon-button, .cabecera-modo, .category-pill, .pestana):focus-visible {
+  outline: 2px solid var(--hero-anillo);
+  outline-offset: 2px;
+}
+
+/* ── Lo que flota (resultados del buscador, menús): tarjeta blanca sin borde ── */
+html[data-estilo='hero'] :is(.results, .apple-select-menu) {
+  background: var(--hero-superficie);
+  border-color: transparent;
+  border-radius: 14px;
+}
+
+/* ── Diálogos: tarjeta muy redondeada sobre un fondo oscurecido y desenfocado ── */
+html[data-estilo='hero'] .modal {
+  animation: hero-aparece 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  backdrop-filter: none;
+  background: var(--hero-superficie);
+  border-color: transparent;
+  border-radius: 24px;
+}
+html[data-estilo='hero'] .modal-overlay,
+html[data-estilo='hero'] .modal-overlay::backdrop {
+  backdrop-filter: blur(6px);
+  background: rgba(9, 9, 11, 0.38);
+}
+
+/* ── Avisos: abajo en el centro, tarjeta blanca muy redondeada; el icono en el color del tono ── */
+html[data-estilo='hero'] .toast-viewport {
+  bottom: 22px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 28px));
+}
+html[data-estilo='hero'] .toast {
+  align-items: center;
+  border-color: transparent;
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 20px 50px -16px rgba(0, 0, 0, 0.28);
+  padding: 14px 12px 14px 16px;
+}
+html[data-estilo='hero'][data-theme='dark'] .toast {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 20px 50px -16px rgba(0, 0, 0, 0.8);
+}
+html[data-estilo='hero'] .toast:not(.leaving) {
+  animation: hero-aparece 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes hero-aparece {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-estilo='hero'] :is(.button, .row-add-button, .draft-resume-button, .icon-button, .cabecera-modo, .category-pill, .pestana) {
+    transition: none;
+  }
+  html[data-estilo='hero'] :is(.button, .row-add-button, .draft-resume-button, .icon-button, .cabecera-modo, .category-pill, .pestana):active:not(:disabled) {
+    transform: none;
+  }
+  html[data-estilo='hero'] .tira-3d[data-pildora]::before {
+    transition: none;
+  }
+  html[data-estilo='hero'] :is(.modal, .toast:not(.leaving)) {
+    animation: none;
+  }
+}

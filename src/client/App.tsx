@@ -23,6 +23,7 @@ import type {
 } from './types';
 import { roundQuantity, uid } from './utils';
 import { mergeOrderOfs, type RpsOrderOf } from './orderOfs';
+import { iniciarPildoras } from './pildoraDeslizante';
 import { describeActiveModel } from './activeModel';
 import {
   addQuantities,
@@ -1049,4 +1050,5 @@ function App() {
   );
 }
 
+iniciarPildoras();
 createRoot(document.getElementById('root')!).render(<App />);
