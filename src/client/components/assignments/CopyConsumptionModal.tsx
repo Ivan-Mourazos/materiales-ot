@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowRight, ChevronDown, ClipboardList, Download, Loader2, Search, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckSquare, ChevronDown, ClipboardList, Download, Loader2, Search, Square, X } from 'lucide-react';
 import type { OfBlock } from '../../types';
 import type { RpsOrderOf } from '../../orderOfs';
 import { consumptionToOfBlocks, type ConsumptionReport, type LoadMode } from '../../consumptionLoad';
 import { formatDisplayText, formatNumber, uid } from '../../utils';
 import { ModelDialog } from '../common/ModelDialog';
+import { TriStateCheckbox } from '../common/TriStateCheckbox';
+import { allLineKeys, lineKey, ofSelectionState, toggleOf } from '../../reusePick';
 
 /**
  * Copia el despiece real (lo que se gastó de verdad en cada OF, según RPS) de un pedido ya
@@ -32,6 +34,8 @@ export function CopyConsumptionModal({
   const [mode, setMode] = useState<LoadMode>('blank');
   const [scaleToUnits, setScaleToUnits] = useState(false);
   const [openOf, setOpenOf] = useState<string | null>(null);
+  // Qué líneas se mandan al panel (Iván, 03/11/2026: «poder elegir lo que mandamos al panel o no»)
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
   const lastQuery = useRef('');
 
@@ -76,6 +80,8 @@ export function CopyConsumptionModal({
       if (!data.totals?.lines) throw new Error(`El pedido ${data.order} no tiene material imputado en RPS todavía.`);
       setReport(data);
       setOpenOf(null);
+      // Al consultar (o cambiar lo de la OF de al lado) se vuelve a marcar todo
+      setSelected(allLineKeys((data as ConsumptionReport).ofs.filter((item) => item.materials.length > 0)));
     } catch (fetchError) {
       setReport(null);
       setError(fetchError instanceof Error ? fetchError.message : 'Error inesperado.');
@@ -91,13 +97,44 @@ export function CopyConsumptionModal({
         : null,
     [report, mode, targetOfs, scaleToUnits]
   );
-  const sources = report ? report.ofs.filter((item) => item.materials.length > 0) : [];
+  const sources = useMemo(() => (report ? report.ofs.filter((item) => item.materials.length > 0) : []), [report]);
+  // Lo que se manda de verdad: solo las líneas marcadas; una OF sin ninguna no se manda
+  const picked = useMemo(
+    () =>
+      (preview?.ofs || [])
+        .map((block, ofIndex) => ({
+          ...block,
+          materials: block.materials.filter((_, lineIndex) => selected.has(lineKey(ofIndex, lineIndex)))
+        }))
+        .filter((block) => block.materials.length > 0),
+    [preview, selected]
+  );
+  const pickedLines = picked.reduce((sum, block) => sum + block.materials.length, 0);
+  // Restos de lona (RESTO…): se gastan pero no se reservan; con un botón se desmarcan todos
+  const restKeys = useMemo(() => {
+    const keys: string[] = [];
+    sources.forEach((source, ofIndex) =>
+      source.materials.forEach((line, lineIndex) => {
+        if (line.code.toUpperCase().startsWith('RESTO')) keys.push(lineKey(ofIndex, lineIndex));
+      })
+    );
+    return keys;
+  }, [sources]);
+
+  function toggleLine(key: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   function confirm() {
-    if (!report || !preview) return;
-    const parts = [`${preview.ofs.length} OFs y ${report.totals.lines} líneas del pedido ${report.order}`];
-    if (mode === 'target') parts.push(`${preview.matched} emparejadas con el ${targetOrder}`);
-    onLoad(preview.ofs, `Despiece real cargado: ${parts.join(', ')}.`);
+    if (!report || picked.length === 0) return;
+    const parts = [`${picked.length} OFs y ${pickedLines} líneas del pedido ${report.order}`];
+    if (mode === 'target') parts.push(`${picked.filter((block) => block.of).length} con OF del ${targetOrder}`);
+    onLoad(picked, `Despiece real cargado: ${parts.join(', ')}.`);
   }
 
   return (
@@ -244,13 +281,50 @@ export function CopyConsumptionModal({
             </p>
           )}
 
+          <div className="transfer-parts-toolbar">
+            <span className="parts-count-label">
+              Al panel: {picked.length} de {sources.length} OFs · {pickedLines} de {report.totals.lines} líneas
+            </span>
+            <div className="quick-selection-buttons">
+              <button className="button button-ghost-sm" type="button" onClick={() => setSelected(allLineKeys(sources))}>
+                <CheckSquare aria-hidden="true" /> Marcar todo
+              </button>
+              <button className="button button-ghost-sm" type="button" onClick={() => setSelected(new Set())}>
+                <Square aria-hidden="true" /> Desmarcar todo
+              </button>
+              {restKeys.some((key) => selected.has(key)) && (
+                <button
+                  className="button button-ghost-sm"
+                  type="button"
+                  title="Desmarca las líneas de restos de lona (RESTO…), que no se reservan"
+                  onClick={() =>
+                    setSelected((current) => {
+                      const next = new Set(current);
+                      restKeys.forEach((key) => next.delete(key));
+                      return next;
+                    })
+                  }
+                >
+                  <Square aria-hidden="true" /> Quitar restos de lona
+                </button>
+              )}
+            </div>
+          </div>
+
           <ul className="consumption-list">
             {sources.map((source, index) => {
               const block = preview.ofs[index];
               const isOpen = openOf === source.of;
               const unplanned = new Set(source.unplanned.map((line) => line.code));
+              const state = ofSelectionState(source, index, selected);
               return (
-                <li key={source.of} className={isOpen ? 'open' : undefined}>
+                <li key={source.of} className={`${isOpen ? 'open' : ''}${state === 'none' ? ' is-off' : ''}`}>
+                  <div className="consumption-head">
+                  <TriStateCheckbox
+                    state={state}
+                    label={`Mandar al panel la OF ${source.of}`}
+                    onChange={() => setSelected((current) => toggleOf(source, index, current))}
+                  />
                   <button
                     type="button"
                     className="consumption-row"
@@ -273,12 +347,21 @@ export function CopyConsumptionModal({
                       <span className="consumption-tag warn">{source.unplanned.length} no previstas</span>
                     )}
                   </button>
+                  </div>
                   {isOpen && block && (
                     <div className="consumption-detail">
                       <table>
                         <tbody>
-                          {block.materials.map((line) => (
-                            <tr key={line.id}>
+                          {block.materials.map((line, lineIndex) => (
+                            <tr key={line.id} className={selected.has(lineKey(index, lineIndex)) ? undefined : 'is-off'}>
+                              <td className="consumption-check">
+                                <input
+                                  type="checkbox"
+                                  checked={selected.has(lineKey(index, lineIndex))}
+                                  onChange={() => toggleLine(lineKey(index, lineIndex))}
+                                  aria-label={`Mandar ${line.code} al panel`}
+                                />
+                              </td>
                               <td>{line.code}</td>
                               <td>
                                 {formatDisplayText(line.description)}
@@ -312,7 +395,7 @@ export function CopyConsumptionModal({
           <button className="button button-muted" type="button" onClick={onClose} disabled={isLoading}>
             Cancelar
           </button>
-          <button className="button button-primary" type="button" onClick={confirm} disabled={!report || isLoading}>
+          <button className="button button-primary" type="button" onClick={confirm} disabled={!report || isLoading || picked.length === 0}>
             <Download aria-hidden="true" />
             Cargar en la asignación
           </button>

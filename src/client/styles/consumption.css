@@ -172,7 +172,7 @@
   border-top: 1px solid var(--border);
 }
 
-.consumption-detail td:first-child {
+.consumption-detail td:nth-child(2) {
   width: 1%;
   font-family: var(--font-mono);
   white-space: nowrap;
@@ -194,4 +194,33 @@
 .consumption-note {
   color: var(--ink-3);
   font-size: 12.5px;
+}
+
+/* Casillas para elegir qué se manda al panel */
+.consumption-head {
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+}
+.consumption-head .consumption-row {
+  flex: 1;
+  min-width: 0;
+  padding-left: 8px;
+}
+.consumption-head .reuse-of-check,
+.consumption-check input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-brand-500);
+  cursor: pointer;
+}
+.consumption-detail td.consumption-check {
+  width: 1%;
+  padding-right: 0;
+}
+.consumption-list > li.is-off .consumption-row,
+.consumption-detail tr.is-off td:not(.consumption-check) {
+  opacity: 0.5;
 }

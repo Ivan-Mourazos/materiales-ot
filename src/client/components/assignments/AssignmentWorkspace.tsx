@@ -1,4 +1,4 @@
-import { FileClock, Save, X } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, FileClock, Save, X } from 'lucide-react';
 import type { Article, OfBlock } from '../../types';
 import type { Quantity, QuantityInput } from '../../quantities';
 import { OfCard } from './OfCard';
@@ -34,7 +34,10 @@ export function AssignmentWorkspace({
   onMoveOf,
   onMoveOfBy,
   onMoveLine,
-  onMoveLineBy
+  onMoveLineBy,
+  collapsedOfs,
+  onToggleCollapsed,
+  onSetAllCollapsed
 }: {
   orderCode: string;
   setOrderCode: (value: string) => void;
@@ -65,6 +68,9 @@ export function AssignmentWorkspace({
   onMoveOfBy: (ofId: string, delta: -1 | 1) => void;
   onMoveLine: (lineId: string, targetOfId: string, targetLineId: string | null, position: DropPosition) => void;
   onMoveLineBy: (lineId: string, delta: -1 | 1) => void;
+  collapsedOfs: Set<string>;
+  onToggleCollapsed: (ofId: string) => void;
+  onSetAllCollapsed: (collapsed: boolean) => void;
 }) {
   return (
     <section className="workspace view" key="assignments">
@@ -129,6 +135,19 @@ export function AssignmentWorkspace({
             </div>
           </div>
         )}
+        {ofs.length > 1 && (
+          <div className="of-list-toolbar">
+            <span>{ofs.length} OFs · arrastra el asa ⋮⋮ para ordenarlas</span>
+            <button className="button button-muted button-sm" type="button" onClick={() => onSetAllCollapsed(true)}>
+              <ChevronsDownUp aria-hidden="true" />
+              Plegar todas
+            </button>
+            <button className="button button-muted button-sm" type="button" onClick={() => onSetAllCollapsed(false)}>
+              <ChevronsUpDown aria-hidden="true" />
+              Desplegar todas
+            </button>
+          </div>
+        )}
         {ofs.map((ofBlock, index) => (
           <OfCard
             key={ofBlock.id}
@@ -145,6 +164,8 @@ export function AssignmentWorkspace({
             onMoveOfBy={onMoveOfBy}
             onMoveLine={onMoveLine}
             onMoveLineBy={onMoveLineBy}
+            isCollapsed={collapsedOfs.has(ofBlock.id)}
+            onToggleCollapsed={onToggleCollapsed}
           />
         ))}
       </section>

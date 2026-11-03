@@ -103,6 +103,8 @@ function App() {
   const [isImportingOfs, setIsImportingOfs] = useState(false);
   const [isCopyConsumptionOpen, setIsCopyConsumptionOpen] = useState(false);
   const [reuseEntry, setReuseEntry] = useState<HistoryEntry | null>(null);
+  // OFs plegadas en Asignaciones (solo la cabecera); no se guarda, es cómo se ve ahora
+  const [collapsedOfs, setCollapsedOfs] = useState<Set<string>>(() => new Set());
   // Lo ya confirmado en este intento de generar: al aceptar el siguiente aviso no se vuelve a preguntar.
   const lastSaveConfirmations = useRef({ confirmOverwrite: false, confirmOfs: false });
   const [missingQuantities, setMissingQuantities] = useState<MissingQuantity[] | null>(null);
@@ -878,6 +880,16 @@ function App() {
             setOfs((current) => moveLine(current, lineId, targetOfId, targetLineId, position))
           }
           onMoveLineBy={(lineId, delta) => setOfs((current) => moveLineBy(current, lineId, delta))}
+          collapsedOfs={collapsedOfs}
+          onToggleCollapsed={(ofId) =>
+            setCollapsedOfs((current) => {
+              const next = new Set(current);
+              if (next.has(ofId)) next.delete(ofId);
+              else next.add(ofId);
+              return next;
+            })
+          }
+          onSetAllCollapsed={(collapsed) => setCollapsedOfs(collapsed ? new Set(ofs.map((block) => block.id)) : new Set())}
         />
       )}
 

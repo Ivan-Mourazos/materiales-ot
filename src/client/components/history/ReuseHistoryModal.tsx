@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowRight, CheckSquare, ChevronDown, Copy, Square, X } from 'lucide-react';
 import type { HistoryEntry, OfBlock } from '../../types';
 import { allLineKeys, buildPickedOfs, lineKey, ofSelectionState, toggleOf } from '../../reusePick';
 import { formatDisplayText, formatNumber, uid } from '../../utils';
 import { ArticleThumb } from '../common/ArticleThumb';
 import { ModelDialog } from '../common/ModelDialog';
+import { TriStateCheckbox } from '../common/TriStateCheckbox';
 
 /**
  * Reutilizar una reserva del historial eligiendo qué OFs llevar y qué materiales dentro de cada
@@ -139,13 +140,4 @@ export function ReuseHistoryModal({
       </div>
     </ModelDialog>
   );
-}
-
-/** Casilla con tres estados: todas, algunas (raya) o ninguna. */
-function TriStateCheckbox({ state, label, onChange }: { state: 'all' | 'some' | 'none'; label: string; onChange: () => void }) {
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (ref.current) ref.current.indeterminate = state === 'some';
-  }, [state]);
-  return <input ref={ref} type="checkbox" className="reuse-of-check" checked={state === 'all'} onChange={onChange} aria-label={label} />;
 }

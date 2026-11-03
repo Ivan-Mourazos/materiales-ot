@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { AlertTriangle, GripVertical, PackagePlus, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronDown, GripVertical, PackagePlus, Trash2 } from 'lucide-react';
 import { draggingItem, dropPositionFor, endDrag, startDrag } from '../../dragState';
 import type { DropPosition } from '../../reorder';
 import type { Article, OfBlock } from '../../types';
@@ -21,7 +21,9 @@ export function OfCard({
   onMoveOf,
   onMoveOfBy,
   onMoveLine,
-  onMoveLineBy
+  onMoveLineBy,
+  isCollapsed = false,
+  onToggleCollapsed
 }: {
   index: number;
   ofBlock: OfBlock;
@@ -36,6 +38,9 @@ export function OfCard({
   onMoveOfBy: (ofId: string, delta: -1 | 1) => void;
   onMoveLine: (lineId: string, targetOfId: string, targetLineId: string | null, position: DropPosition) => void;
   onMoveLineBy: (lineId: string, delta: -1 | 1) => void;
+  /** Plegada: solo la cabecera (Iván, 03/11/2026: para ordenar sin tanto desplazamiento). */
+  isCollapsed?: boolean;
+  onToggleCollapsed: (ofId: string) => void;
 }) {
   const cardRef = useRef<HTMLElement>(null);
   const handleRef = useRef<HTMLButtonElement>(null);
@@ -66,7 +71,7 @@ export function OfCard({
   return (
     <article
       ref={cardRef}
-      className={`of-card ${isDuplicate ? 'duplicate' : ''}${dropMark ? ` drop-${dropMark}` : ''}`}
+      className={`of-card ${isDuplicate ? 'duplicate' : ''}${isCollapsed ? ' collapsed' : ''}${dropMark ? ` drop-${dropMark}` : ''}`}
       onDragOver={(event) => {
         const item = draggingItem();
         if (!item) return;
@@ -131,6 +136,18 @@ export function OfCard({
           />
         </label>
         <button
+          className="of-collapse-toggle"
+          type="button"
+          onClick={() => onToggleCollapsed(ofBlock.id)}
+          aria-expanded={!isCollapsed}
+          title={isCollapsed ? 'Desplegar esta OF' : 'Plegar esta OF (para ordenar sin tanto desplazamiento)'}
+        >
+          <span>
+            {ofBlock.materials.length} {ofBlock.materials.length === 1 ? 'material' : 'materiales'}
+          </span>
+          <ChevronDown aria-hidden="true" />
+        </button>
+        <button
           className="icon-button danger"
           type="button"
           onClick={() => onRemoveOf(ofBlock.id)}
@@ -148,6 +165,8 @@ export function OfCard({
         </div>
       )}
 
+      {!isCollapsed && (
+      <>
       <div className="line-editor">
         <ArticlePicker ref={pickerRef} onSelect={setSelectedArticle} />
         <label className="field quantity-field">
@@ -198,6 +217,8 @@ export function OfCard({
         onMoveLine={onMoveLine}
         onMoveLineBy={onMoveLineBy}
       />
+      </>
+      )}
     </article>
   );
 }
