@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
@@ -15,11 +15,7 @@ import type {
   ModelSaveChange,
   OfBlock,
   OrderDraft,
-  PersistedState,
-  ThemeMode,
-  Toast,
-  ToastAction,
-  ToastType
+  PersistedState
 } from './types';
 import { roundQuantity, uid } from './utils';
 import { mergeOrderOfs, type RpsOrderOf } from './orderOfs';
@@ -51,9 +47,10 @@ import { SaveAsModelModal } from './components/models/SaveAsModelModal';
 import { DraftsView } from './components/drafts/DraftsView';
 import { SaveDraftModal } from './components/drafts/SaveDraftModal';
 import { CopyConsumptionModal } from './components/assignments/CopyConsumptionModal';
+import { useTheme } from './hooks/useTheme';
+import { useToasts } from './hooks/useToasts';
 
 const storageKey = 'materiales-ot-state-v3';
-const themeStorageKey = 'materiales-ot-theme';
 
 function createOf(description = ''): OfBlock {
   return {
@@ -87,61 +84,6 @@ function getInitialReservationState(): PersistedState {
   } catch {
     return { orderCode: '', ofs: [createOf()] };
   }
-}
-
-/**
- * Tema claro u oscuro. Mientras no se elige, sigue al sistema (`system`); el botón de la
- * cabecera, como el de CoordinaOT, pasa al contrario del que se ve y lo recuerda.
- */
-function useTheme() {
-  const [mode, setMode] = useState<ThemeMode>(() => {
-    const saved = localStorage.getItem(themeStorageKey);
-    return saved === 'light' || saved === 'dark' ? saved : 'system';
-  });
-  const [systemDark, setSystemDark] = useState(
-    () => window.matchMedia('(prefers-color-scheme: dark)').matches
-  );
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => setSystemDark(media.matches);
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
-  }, []);
-
-  const resolved: 'light' | 'dark' = mode === 'system' ? (systemDark ? 'dark' : 'light') : mode;
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = resolved;
-    if (mode === 'system') localStorage.removeItem(themeStorageKey);
-    else localStorage.setItem(themeStorageKey, mode);
-  }, [mode, resolved]);
-
-  const toggle = useCallback(() => setMode(resolved === 'dark' ? 'light' : 'dark'), [resolved]);
-
-  return { resolved, toggle };
-}
-
-function useToasts() {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const dismissToast = useCallback((id: string) => {
-    setToasts((current) =>
-      current.map((toast) => (toast.id === id ? { ...toast, leaving: true } : toast))
-    );
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 260);
-  }, []);
-
-  const pushToast = useCallback((text: string, type: ToastType = 'info', action?: ToastAction) => {
-    const id = uid();
-    setToasts((current) => [...current.slice(-3), { id, text, type, action }]);
-    const ttl = action ? 7000 : type === 'error' ? 6500 : 4200;
-    window.setTimeout(() => dismissToast(id), ttl);
-  }, [dismissToast]);
-
-  return { toasts, pushToast, dismissToast };
 }
 
 function App() {
