@@ -3,6 +3,7 @@ import { GripVertical, Trash2 } from 'lucide-react';
 import { draggingItem, dropPositionFor, endDrag, startDrag } from '../../dragState';
 import type { DropPosition } from '../../reorder';
 import { ArticleThumb } from '../common/ArticleThumb';
+import { ArticleSheetByCode } from '../catalog/ArticleSheetModal';
 import type { OfBlock } from '../../types';
 import { formatDisplayText } from '../../utils';
 import { hasQuantity, parseQuantityInput, quantityInputValue, type Quantity } from '../../quantities';
@@ -25,6 +26,7 @@ export function MaterialTable({
   // Dónde caería el material que se arrastra: fila y si va delante o detrás
   const [dropMark, setDropMark] = useState<{ lineId: string; position: DropPosition } | null>(null);
   const handleRefs = useRef(new Map<string, HTMLButtonElement>());
+  const [sheetCode, setSheetCode] = useState<string | null>(null);
 
   return (
     <div className="materials-table-wrap">
@@ -102,7 +104,7 @@ export function MaterialTable({
                 </td>
                 <td>
                   <span className="material-code">
-                    <ArticleThumb key={line.code} code={line.code} />
+                    <button type="button" className="article-thumb-button" aria-label={`Abrir ficha de ${line.code}`} title="Abrir ficha del artículo" onClick={() => setSheetCode(line.code)}><ArticleThumb key={line.code} code={line.code} /></button>
                     <strong>{line.code}</strong>
                   </span>
                 </td>
@@ -131,6 +133,7 @@ export function MaterialTable({
           )}
         </tbody>
       </table>
+      {sheetCode && <ArticleSheetByCode key={sheetCode} code={sheetCode} onClose={() => setSheetCode(null)} />}
     </div>
   );
 }

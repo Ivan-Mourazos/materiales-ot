@@ -5,7 +5,7 @@ import type { Article, ArticleFilters, CatalogFilterState, OfBlock } from '../..
 import { formatDisplayText, formatNumber, formatUnitLabel } from '../../utils';
 import { parseQuantityInput, type QuantityInput } from '../../quantities';
 import { FilterSelect } from '../common/FilterSelect';
-import { StockDetailModal } from './StockDetailModal';
+import { ArticleSheetModal } from './ArticleSheetModal';
 
 const defaultCatalogFilters: CatalogFilterState = {
   q: '',
@@ -226,7 +226,7 @@ export function ArticleCatalog({
         </table>
       </div>
 
-      {stockArticle && <StockDetailModal article={stockArticle} onClose={() => setStockArticle(null)} />}
+      {stockArticle && <ArticleSheetModal article={stockArticle} onClose={() => setStockArticle(null)} />}
     </section>
   );
 }

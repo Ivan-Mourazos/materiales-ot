@@ -3,6 +3,47 @@ import { config } from './config.js';
 import { orderKey, pieceFromOrderLine, toDottedOrderCode, toRpsOfCode } from './orders.js';
 import { buildConsumption } from './consumption.js';
 import { detectWidth } from './width.js';
+import { mapArticleSheet, mapArticleVariants, mapArticleUsage } from './articleSheet.js';
+import { openingSql, variantsSql, usageSql } from './articleSheetSql.js';
+
+// Un viaje por sección; la necesidad de OF nunca forma parte de la apertura.
+export async function getArticleSheet(idArticle, section = 'opening', options = {}) {
+  const pool = await getPool();
+  const request = pool.request();
+  request.input('company', sql.VarChar(10), config.db.company);
+  request.input('idArticle', sql.VarChar(80), idArticle);
+  const requestedOffset = Number(options.offset);
+  const offset = Number.isFinite(requestedOffset) ? Math.max(0, Math.floor(requestedOffset)) : 0;
+  const limit = Math.min(80, Math.max(1, Math.floor(Number(options.limit) || 40)));
+  if (section === 'variants') {
+    const filter = String(options.q || '').trim().slice(0, 120);
+    request.input('filter', sql.NVarChar(120), filter);
+    request.input('like', sql.NVarChar(260), `%${escapeLike(filter)}%`);
+    request.input('offset', sql.Int, offset);
+    request.input('limit', sql.Int, limit);
+  }
+  const started = performance.now();
+  const result = await request.query(section === 'variants' ? variantsSql : section === 'usage' ? usageSql : openingSql);
+  const data = section === 'variants' ? mapArticleVariants(result.recordsets, { offset, limit }) : section === 'usage' ? mapArticleUsage(result.recordsets) : mapArticleSheet(result.recordsets);
+  if (data?.article) {
+    const article = data.article;
+    const width = detectWidth(article);
+    const fromUnit = detectWidth({ unitCode: article.unitCode, unitDescription: article.unitDescription }).detectedWidth;
+    const fromCode = detectWidth({ code: article.code }).detectedWidth;
+    Object.assign(article, width, { widthSource: width.detectedWidth ? (fromUnit ? 'unidad de ficha' : fromCode ? 'código del artículo' : 'descripción del artículo') : null });
+  }
+  return data ? { ...data, elapsedMs: Math.round((performance.now() - started) * 10) / 10 } : null;
+}
+
+// Igualdad exacta, también para materiales antiguos o fuera del catálogo habitual.
+export async function findArticleByCode(code) {
+  const pool = await getPool();
+  const request = pool.request();
+  request.input('company', sql.VarChar(10), config.db.company);
+  request.input('code', sql.VarChar(120), code);
+  const result = await request.query('SELECT TOP 1 IDArticle idArticle,CodArticle code,Description description FROM STKArticle WHERE CodCompany=@company AND CodArticle=@code');
+  return result.recordset[0] || null;
+}
 
 let poolPromise;
 

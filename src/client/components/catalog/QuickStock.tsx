@@ -3,7 +3,7 @@ import { Search, X } from 'lucide-react';
 import type { Article } from '../../types';
 import { ArticlePicker, type ArticlePickerHandle } from '../common/ArticlePicker';
 import { ModelDialog } from '../common/ModelDialog';
-import { StockDetailModal } from './StockDetailModal';
+import { ArticleSheetModal } from './ArticleSheetModal';
 
 /**
  * Consultar el stock de un artículo desde cualquier pestaña (Iván, 03/11/2026: «para consultar
@@ -47,7 +47,7 @@ export function QuickStockButton() {
           }}
         />
       )}
-      {article && <StockDetailModal article={article} onClose={() => setArticle(null)} />}
+      {article && <ArticleSheetModal article={article} onClose={() => setArticle(null)} />}
     </>
   );
 }
@@ -70,8 +70,8 @@ function QuickStockSearch({ onClose, onPick }: { onClose: () => void; onPick: (a
           <Search aria-hidden="true" />
         </div>
         <div>
-          <h2 id="quick-stock-title">Consultar stock</h2>
-          <p className="modal-subtitle">Busca por código o descripción y elige el artículo para ver su stock por almacén.</p>
+          <h2 id="quick-stock-title">Consultar artículo</h2>
+          <p className="modal-subtitle">Busca por código o descripción y elige el artículo para abrir su ficha.</p>
         </div>
         <button className="icon-button" type="button" onClick={onClose} title="Cerrar" aria-label="Cerrar">
           <X aria-hidden="true" />

@@ -11,6 +11,8 @@ import {
   closeDatabase,
   getArticleImage,
   getArticleStockDetails,
+  getArticleSheet,
+  findArticleByCode,
   getOfOwners,
   getOrderConsumption,
   getOrderOfs,
@@ -291,6 +293,32 @@ app.get('/api/article-image/:code', async (req, res, next) => {
     next(error);
   }
 });
+
+app.get('/api/article-by-code', async (req, res) => {
+  const code = String(req.query.code || '').trim();
+  if (!code || code.length > 120) return res.status(400).json({ error: 'Falta un código de artículo válido.' });
+  try {
+    const article = await findArticleByCode(code);
+    res.status(article ? 200 : 404).json(article ? { article } : { error: 'No se encontró el artículo en RPS.' });
+  } catch (error) {
+    console.error('No se pudo buscar el artículo en RPS:', error.message);
+    res.status(500).json({ error: 'No se pudo buscar el artículo en RPS.' });
+  }
+});
+
+for (const section of ['opening', 'variants', 'usage']) {
+  app.get(`/api/article-sheet${section === 'opening' ? '' : `/${section}`}`, async (req, res) => {
+    const idArticle = String(req.query.idArticle || '').trim();
+    if (!idArticle || idArticle.length > 80) return res.status(400).json({ error: 'Falta un artículo válido.' });
+    try {
+      const data = await getArticleSheet(idArticle, section, req.query);
+      res.status(data ? 200 : 404).json(data || { error: 'No se encontró el artículo en RPS.' });
+    } catch (error) {
+      console.error('No se pudo cargar la ficha de RPS:', error.message);
+      res.status(500).json({ error: 'No se pudo cargar esta sección de la ficha en RPS. Inténtalo de nuevo.' });
+    }
+  });
+}
 
 app.get('/api/article-stock', async (req, res, next) => {
   try {
