@@ -306,6 +306,16 @@ app.get('/api/article-image/:code', async (req, res, next) => {
   }
 });
 
+// ¿Llega este servidor a la carpeta de documentos de RPS? Se mira como mucho una vez por minuto:
+// cuando IT la monte, «Abrir» aparece solo en la ficha, sin reiniciar.
+let rpsDocumentsAccess = { checkedAt: 0, ok: false };
+async function canOpenRpsDocuments() {
+  if (Date.now() - rpsDocumentsAccess.checkedAt < 60_000) return rpsDocumentsAccess.ok;
+  const status = config.rpsShareRoot ? await getPathStatus(config.rpsShareRoot).catch(() => null) : null;
+  rpsDocumentsAccess = { checkedAt: Date.now(), ok: Boolean(status?.configured && status.valid && status.accessible === true) };
+  return rpsDocumentsAccess.ok;
+}
+
 // Abrir un documento de la ficha de artículo (rpsDocuments.js). Respuesta en texto llano si falla,
 // porque se abre en una pestaña nueva del navegador.
 app.get('/api/article-document', async (req, res) => {
@@ -397,6 +407,8 @@ for (const section of ['opening', 'variants', 'usage']) {
     if (!idArticle || idArticle.length > 80) return res.status(400).json({ error: 'Falta un artículo válido.' });
     try {
       const data = await getArticleSheet(idArticle, section, req.query);
+      // La ficha solo ofrece «Abrir» en los documentos si este servidor llega a la carpeta de RPS
+      if (data && section === 'opening') data.documentsCanOpen = await canOpenRpsDocuments();
       res.status(data ? 200 : 404).json(data || { error: 'No se encontró el artículo en RPS.' });
     } catch (error) {
       console.error('No se pudo cargar la ficha de RPS:', error.message);

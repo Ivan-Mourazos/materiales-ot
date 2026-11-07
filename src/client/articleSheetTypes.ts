@@ -23,6 +23,8 @@ export type ArticleSheet = {
     tariffs: Tariff[];
   };
   documents: { id: string; name: string; type: string; path: string; origin: string }[];
+  /** El servidor llega a la carpeta de documentos de RPS: se puede ofrecer «Abrir». */
+  documentsCanOpen?: boolean;
 };
 export type Variants = { total: number; offset: number; limit: number; articles: (Article & { attributes: string[]; blockedSales: boolean; blockedMaintenance: boolean })[] };
 export type Usage = {
