@@ -9,12 +9,14 @@ export function ModelCard({
   onUseModel,
   onEditModel,
   onDuplicateModel,
+  onCompareModel,
   onDeleteModel
 }: {
   model: AssignmentModel;
   onUseModel: (model: AssignmentModel) => void;
   onEditModel: (model: AssignmentModel) => void;
   onDuplicateModel: (model: AssignmentModel) => void;
+  onCompareModel: (model: AssignmentModel) => void;
   onDeleteModel: (id: string, name: string) => void;
 }) {
   const detailId = useId();
@@ -59,6 +61,7 @@ export function ModelCard({
         </button>
 
         <div className="model-actions-bar">
+          <button className="button button-ghost-sm" type="button" onClick={() => onCompareModel(model)}>Comparar con pedidos reales</button>
           <button
             className="button button-primary model-use-button"
             type="button"

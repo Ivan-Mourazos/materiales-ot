@@ -1,0 +1,12 @@
+.model-dialog .model-comparison-modal { width: min(1200px, 100%); }
+.model-dialog .model-comparison-modal .modal-header { grid-template-columns: minmax(0, 1fr) 36px; }
+.model-actions-bar { flex-wrap: wrap; }
+.comparison-search { display: flex; gap: 12px; align-items: end; margin: 16px 0; }
+.comparison-search .field { flex: 1; }
+.comparison-part { margin: 20px 0; }
+.comparison-description { display: block; font-size: 0.85em; white-space: normal; min-width: 150px; }
+.comparison-warnings { margin: 12px 0; }
+.comparison-warnings summary { cursor: pointer; }
+.comparison-matches summary { cursor: pointer; font-weight: 600; }
+.comparison-matches .field { margin: 10px 0; }
+@media (max-width: 600px) { .comparison-search { flex-direction: column; align-items: stretch; } }

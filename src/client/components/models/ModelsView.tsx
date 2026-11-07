@@ -7,6 +7,7 @@ import { useVersionedSave } from '../common/useVersionedSave';
 import { ModelCard } from './ModelCard';
 import { ModelEditorModal } from './ModelEditorModal';
 import { ModelTransferModal } from './ModelTransferModal';
+import { ModelComparisonModal } from './ModelComparisonModal';
 
 const VIEW_STORAGE_KEY = 'materiales-ot-modelos-vista';
 
@@ -50,6 +51,7 @@ export function ModelsView({
   const [editorOpen, setEditorOpen] = useState(false);
   const [modelToEdit, setModelToEdit] = useState<AssignmentModel | null>(null);
   const [modelToTransfer, setModelToTransfer] = useState<AssignmentModel | null>(null);
+  const [modelToCompare, setModelToCompare] = useState<AssignmentModel | null>(null);
   const [modelToDelete, setModelToDelete] = useState<{ id: string; name: string } | null>(null);
   const { saveVersioned, conflictDialog } = useVersionedSave();
   const [view, setView] = useState<LibraryView>(readLibraryView);
@@ -140,6 +142,7 @@ export function ModelsView({
           setEditorOpen(true);
         }}
         onDuplicateModel={handleDuplicateModel}
+        onCompareModel={setModelToCompare}
         onDeleteModel={(id, name) => setModelToDelete({ id, name })}
       />
     );
@@ -375,6 +378,23 @@ export function ModelsView({
       )}
 
       {conflictDialog}
+      {modelToCompare && (
+        <ModelComparisonModal
+          model={modelToCompare}
+          onClose={() => setModelToCompare(null)}
+          onApply={async (parts) => {
+            const previousUpdatedAt = modelToCompare.updatedAt || modelToCompare.createdAt;
+            const { record, created } = await saveVersioned<AssignmentModel>({
+              kind: 'modelo', collectionUrl: '/api/models', responseKey: 'model',
+              id: modelToCompare.id, name: modelToCompare.name,
+              body: { ...modelToCompare, parts }, expectedUpdatedAt: previousUpdatedAt
+            });
+            if (!created) onRecordSaved(record, { previousUpdatedAt, partsChanged: true });
+            pushToast(created ? 'Comparación guardada como modelo nuevo.' : 'Cambios aplicados al modelo.', 'ok');
+            void fetchModels();
+          }}
+        />
+      )}
     </section>
   );
 }

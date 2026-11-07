@@ -7,6 +7,7 @@ import { formatDisplayText } from '../../utils';
 import { parseQuantityInput, type Quantity, type QuantityInput } from '../../quantities';
 import { ArticlePicker, type ArticlePickerHandle } from '../common/ArticlePicker';
 import { MaterialTable } from './MaterialTable';
+import { OfSuggestions } from './OfSuggestions';
 
 export function OfCard({
   index,
@@ -217,6 +218,7 @@ export function OfCard({
         onMoveLine={onMoveLine}
         onMoveLineBy={onMoveLineBy}
       />
+      <OfSuggestions ofBlock={ofBlock} onAddLine={onAddLine} />
       </>
       )}
     </article>

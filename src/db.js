@@ -5,6 +5,8 @@ import { buildConsumption } from './consumption.js';
 import { detectWidth } from './width.js';
 import { mapArticleSheet, mapArticleVariants, mapArticleUsage } from './articleSheet.js';
 import { openingSql, variantsSql, usageSql } from './articleSheetSql.js';
+import { buildSuggestions, SUGGESTION_OPTIONS } from './suggestions.js';
+import { suggestionsSql } from './suggestionsSql.js';
 
 // Un viaje por sección; la necesidad de OF nunca forma parte de la apertura.
 export async function getArticleSheet(idArticle, section = 'opening', options = {}) {
@@ -1037,4 +1039,33 @@ export async function closeDatabase() {
     await pool.close();
     poolPromise = undefined;
   }
+}
+
+// Lote de OFs con caché y promesas compartidas: desplegar tarjetas no repite la consulta.
+export async function getOfSuggestions(ofCodes) {
+  const started = performance.now();
+  const codes = [...new Set(ofCodes.map(toRpsOfCode).filter(Boolean))].sort().slice(0, 200);
+  if (!codes.length) return { ofs: [], options: SUGGESTION_OPTIONS, elapsedMs: 0 };
+  const ofs = await cachedQuery(`suggestions:${codes.join(',')}`, 5 * 60 * 1000, async () => {
+    const pool = await getPool();
+    const request = pool.request();
+    request.input('company', sql.VarChar(10), config.db.company);
+    request.input('historyLimit', sql.Int, SUGGESTION_OPTIONS.limit + 1);
+    request.input('years', sql.Int, SUGGESTION_OPTIONS.years);
+    codes.forEach((code, index) => request.input(`suggestOf${index}`, sql.VarChar(20), code));
+    const result = await request.query(suggestionsSql(codes.map((_, index) => `@suggestOf${index}`)));
+    const historyByArticle = new Map();
+    for (const row of result.recordsets[1]) {
+      if (!historyByArticle.has(row.articleId)) historyByArticle.set(row.articleId, new Map());
+      const history = historyByArticle.get(row.articleId);
+      const of = String(row.ofCode).trim();
+      if (!history.has(of)) history.set(of, { of, units: Number(row.units), materials: [] });
+      if (row.code) history.get(of).materials.push({ code: String(row.code).trim(), description: String(row.description || '').trim(), quantity: Number(row.quantity) });
+    }
+    return result.recordsets[0].map((row) => buildSuggestions({
+      target: { of: String(row.ofCode).trim(), article: row.article ? String(row.article).trim() : null, units: Number(row.units) },
+      history: [...(historyByArticle.get(row.articleId)?.values() || [])]
+    }));
+  });
+  return { ofs, options: SUGGESTION_OPTIONS, elapsedMs: Math.round((performance.now() - started) * 10) / 10 };
 }
