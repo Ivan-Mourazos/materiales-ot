@@ -1,5 +1,6 @@
 import type { MaterialLine, OfBlock } from './types';
 import type { RpsOrderOf } from './orderOfs';
+import { normalizePiece } from '../pieceNames.js';
 
 /** Lo que devuelve /api/order-consumption (ver src/consumption.js). */
 export type ConsumptionLine = { code: string; description: string; quantity: number };
@@ -29,8 +30,6 @@ export type LoadMode = 'target' | 'blank' | 'source';
 
 // Al escalar por unidades se redondea a 2 decimales: son metros o unidades de almacén.
 const scale = (quantity: number, multiplier: number) => Math.round(quantity * multiplier * 100) / 100;
-
-const normalizePiece = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
 
 export function consumptionToOfBlocks({
   report,

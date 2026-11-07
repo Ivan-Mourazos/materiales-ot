@@ -1,0 +1,7 @@
+.of-suggestions { margin: 12px 0; border-top: 1px solid var(--border); padding-top: 12px; }
+.of-suggestions summary { cursor: pointer; font-weight: 600; }
+.suggestions-content { padding: 8px 0; }
+.suggestions-content ul { padding: 0; list-style: none; }
+.suggestions-content li { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.suggestions-content li > div { flex: 1; }
+.suggestions-content .field-hint { display: block; }

@@ -28,6 +28,8 @@ import { appendAudit, listAudit, listKnownUsers, userFromRequest } from './audit
 import { httpError } from './httpError.js';
 import { findOfMismatches, orderKey } from './orders.js';
 import { normalizeReservation } from './validation.js';
+import { getOfSuggestions } from './db.js';
+import { registerSuggestionRoutes } from './suggestionsRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -483,6 +485,8 @@ app.post('/api/export/save', async (req, res, next) => {
     next(error);
   }
 });
+
+registerSuggestionRoutes(app, getOfSuggestions);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Ruta de API no disponible. Reinicia el servidor de la web si acabas de actualizar la aplicación.' });
