@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, Check, Copy, X } from 'lucide-react';
+import { ArrowLeft, Check, Copy, X, ExternalLink } from 'lucide-react';
 import type { Article } from '../../types';
 import type { ArticleSheet, SheetArticle, Usage, Variants } from '../../articleSheetTypes';
 import { ArticleThumb } from '../common/ArticleThumb';
@@ -102,7 +102,7 @@ function SheetContent({ article, titleId, onClose, onSelect, onBack }: { article
         <div hidden={tab !== 'variants'}><VariantPanel id={article.idArticle} active={tab === 'variants'} onSelect={onSelect} /></div>
         {tab === 'purchases' && <Purchases sheet={sheet} />}
         <div hidden={tab !== 'usage'}><UsagePanel id={article.idArticle} active={tab === 'usage'} /></div>
-        {tab === 'documents' && <><h3>Documentos del artículo y del genérico</h3><p className="sheet-muted">Referencias de RPS. Copia la ruta para consultarla desde un equipo con acceso a esa carpeta.</p>{sheet.documents.length ? sheet.documents.map(d => <article className="sheet-card" key={d.id}><strong>{d.name}</strong><p>{d.type} · {d.origin === 'propio' ? 'Propio del artículo' : 'Del genérico'}</p><div className="sheet-path"><code>{d.path || 'Sin ruta informada'}</code>{d.path && <CopyButton value={d.path} label={`Copiar ruta de ${d.name}`} />}</div></article>) : <Empty>Sin documentos enlazados.</Empty>}</>}
+        {tab === 'documents' && <><h3>Documentos del artículo y del genérico</h3><p className="sheet-muted">Fichas y certificados enlazados en RPS. «Abrir» los muestra en una pestaña nueva; si el servidor aún no tiene acceso a la carpeta de RPS, copia la ruta.</p>{sheet.documents.length ? sheet.documents.map(d => <article className="sheet-card" key={d.id}><div className="sheet-doc-head"><strong>{d.name}</strong>{d.path && <a className="button button-muted button-sm" href={`/api/article-document?idArticle=${encodeURIComponent(article.idArticle)}&id=${encodeURIComponent(d.id)}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" />Abrir</a>}</div><p>{d.type} · {d.origin === 'propio' ? 'Propio del artículo' : 'Del genérico'}</p><div className="sheet-path"><code>{d.path || 'Sin ruta informada'}</code>{d.path && <CopyButton value={d.path} label={`Copiar ruta de ${d.name}`} />}</div></article>) : <Empty>Sin documentos enlazados.</Empty>}</>}
       </>}
     </section>
     {/* Hora de la consulta en la hora local de quien mira (antes salía en UTC: una hora menos en invierno) */}

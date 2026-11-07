@@ -21,6 +21,7 @@ import { roundQuantity, uid } from './utils';
 import { mergeOrderOfs, type RpsOrderOf } from './orderOfs';
 import { iniciarPildoras } from './pildoraDeslizante';
 import { moveLine, moveLineBy, moveOf, moveOfBy } from './reorder';
+import { fetchStockCheck } from './stockContext';
 import { describeActiveModel } from './activeModel';
 import {
   addQuantities,
@@ -106,7 +107,8 @@ function App() {
   // OFs plegadas en Asignaciones (solo la cabecera); no se guarda, es cómo se ve ahora
   const [collapsedOfs, setCollapsedOfs] = useState<Set<string>>(() => new Set());
   // Lo ya confirmado en este intento de generar: al aceptar el siguiente aviso no se vuelve a preguntar.
-  const lastSaveConfirmations = useRef({ confirmOverwrite: false, confirmOfs: false });
+  const lastSaveConfirmations = useRef({ confirmOverwrite: false, confirmOfs: false, confirmStock: false });
+  const [stockPrompt, setStockPrompt] = useState<string[] | null>(null);
   const [missingQuantities, setMissingQuantities] = useState<MissingQuantity[] | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [isSaveAsModelOpen, setIsSaveAsModelOpen] = useState(false);
@@ -745,9 +747,10 @@ function App() {
 
   async function saveExcelToNetwork({
     confirmOverwrite = false,
-    confirmOfs = false
-  }: { confirmOverwrite?: boolean; confirmOfs?: boolean } = {}) {
-    lastSaveConfirmations.current = { confirmOverwrite, confirmOfs };
+    confirmOfs = false,
+    confirmStock = false
+  }: { confirmOverwrite?: boolean; confirmOfs?: boolean; confirmStock?: boolean } = {}) {
+    lastSaveConfirmations.current = { confirmOverwrite, confirmOfs, confirmStock };
     if (duplicateOfs.size > 0) {
       pushToast(
         `Hay OFs repetidas: ${Array.from(duplicateOfs).join(', ')}. Corrige los números antes de generar.`,
@@ -760,6 +763,21 @@ function App() {
     if (missing.length > 0) {
       setMissingQuantities(missing);
       return;
+    }
+
+    // Antes de escribir nada: ¿hay libre para todo y nada bloqueado para fabricación? Solo avisa.
+    // Si RPS no responde (o tarda más de 8 s) se sigue como antes, sin comprobar.
+    if (!confirmStock) {
+      setIsSavingToNetwork(true);
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 8000);
+      const check = await fetchStockCheck(ofs, controller.signal).catch(() => null);
+      window.clearTimeout(timer);
+      setIsSavingToNetwork(false);
+      if (check && check.messages.length > 0) {
+        setStockPrompt(check.messages);
+        return;
+      }
     }
 
     setIsSavingToNetwork(true);
@@ -1009,6 +1027,26 @@ function App() {
           onConfirm={() => {
             setOverwritePrompt(null);
             saveExcelToNetwork({ ...lastSaveConfirmations.current, confirmOverwrite: true });
+          }}
+        />
+      )}
+
+      {stockPrompt && (
+        <ConfirmDialog
+          title="Revisa el stock antes de generar"
+          description={
+            <>
+              Según RPS, <strong>no hay bastante libre</strong> (stock menos lo reservado en OFs) o hay artículos
+              bloqueados para fabricación. Puedes generar igualmente si ya está pedido o lo sabéis en taller.
+            </>
+          }
+          items={stockPrompt}
+          confirmLabel="Generar igualmente"
+          initialFocus="cancel"
+          onCancel={() => setStockPrompt(null)}
+          onConfirm={() => {
+            setStockPrompt(null);
+            saveExcelToNetwork({ ...lastSaveConfirmations.current, confirmStock: true });
           }}
         />
       )}

@@ -35,6 +35,142 @@ export async function getArticleSheet(idArticle, section = 'opening', options = 
   return data ? { ...data, elapsedMs: Math.round((performance.now() - started) * 10) / 10 } : null;
 }
 
+// Stock libre y bloqueos de varios artículos a la vez, para avisar en la asignación (stockCheck.js).
+// Mismos criterios que la ficha de artículo: stock de almacenes vigentes, reserva física contra OF
+// abiertas y compras pendientes de recibir. Devuelve un Map código → datos.
+export async function getStockForCodes(codes) {
+  const clean = [...new Set(codes.map((code) => String(code || '').trim().toUpperCase()).filter(Boolean))].slice(0, 300);
+  const result = new Map();
+  if (clean.length === 0) return result;
+
+  const pool = await getPool();
+  const request = pool.request();
+  request.input('company', sql.VarChar(10), config.db.company);
+  clean.forEach((code, index) => request.input(`c${index}`, sql.VarChar(120), code));
+  const rows = (
+    await request.query(`
+      SELECT
+        a.CodArticle AS code,
+        a.Description AS description,
+        mu.CodMeasureUnit AS unit,
+        detail.BlockedManufacturing AS blockedManufacturing,
+        ISNULL(st.Stock, 0) AS physical,
+        ISNULL(rs.Reserved, 0) AS reserved,
+        ISNULL(po.Lines, 0) AS pendingPurchases,
+        po.NextDate AS nextReceipt
+      FROM dbo.STKArticle a
+      LEFT JOIN dbo.GENMeasureUnit mu
+        ON mu.IDMeasureUnit = a.IDUnitQuantityWarehouse
+        AND mu.CodCompany = a.CodCompany
+      OUTER APPLY (
+        SELECT TOP 1 d.BlockedManufacturing
+        FROM dbo.STKArticleDetail d
+        WHERE d.IDArticle = a.IDArticle AND d.CodCompany = a.CodCompany
+        ORDER BY d.IDArticleDetail
+      ) detail
+      OUTER APPLY (
+        SELECT SUM(s.Stock) AS Stock
+        FROM dbo.STKStock s
+        JOIN dbo.GENWarehouse w ON w.IDWarehouse = s.IDWarehouse AND w.CodCompany = s.CodCompany
+        WHERE s.CodCompany = a.CodCompany AND s.IDArticle = a.IDArticle
+          AND w.ClosedDate IS NULL AND (w.InactiveDate IS NULL OR w.InactiveDate > GETDATE())
+      ) st
+      OUTER APPLY (
+        SELECT SUM(r.Quantity) AS Reserved
+        FROM dbo.STKStockReserve r
+        JOIN dbo.STKStock s ON s.IDStock = r.IDStock AND s.CodCompany = r.CodCompany
+        JOIN dbo.GENWarehouse w ON w.IDWarehouse = s.IDWarehouse AND w.CodCompany = s.CodCompany
+        JOIN dbo.CPRMOMaterial mm ON mm.IDMOMaterial = r.IDItem AND mm.CodCompany = r.CodCompany AND mm.IDArticle = s.IDArticle
+        JOIN dbo.CPRMOTask t ON t.IDMOTask = mm.IDMOTask AND t.CodCompany = mm.CodCompany
+        JOIN dbo.CPRManufacturingOrder m ON m.IDManufacturingOrder = t.IDManufacturingOrder AND m.CodCompany = t.CodCompany
+        JOIN dbo.CPRManufacturingOrderSituation ms ON ms.IDManufacturingOrderSituation = m.IDMOSituation AND ms.CodCompany = m.CodCompany
+        WHERE s.CodCompany = a.CodCompany AND s.IDArticle = a.IDArticle
+          AND r.ItemType = 5 AND r.Quantity > 0 AND ms.SituationType IN (1, 2) AND m.Historic = 0
+          AND (m.RealEndDate IS NULL OR m.RealEndDate < '19010101') AND t.Canceled = 0 AND mm.Completed = 0
+          AND w.ClosedDate IS NULL AND (w.InactiveDate IS NULL OR w.InactiveDate > GETDATE())
+      ) rs
+      OUTER APPLY (
+        SELECT COUNT(*) AS Lines, MIN(l.ReceptionDate) AS NextDate
+        FROM dbo.PUROrderLine l
+        JOIN dbo.PUROrder o ON o.IDOrder = l.IDOrder AND o.CodCompany = l.CodCompany
+        LEFT JOIN dbo.PUROrderSituation os ON os.IDOrderSituation = o.IDOrderSituation AND os.CodCompany = o.CodCompany
+        WHERE l.CodCompany = a.CodCompany AND l.IDArticle = a.IDArticle
+          AND o.Historic = 0 AND l.PendingReceive = 1 AND l.Received = 0 AND l.Quantity > l.ReceivedQuantity
+          AND o.SituationType = 0 AND (os.SituationType = 0 OR os.IDOrderSituation IS NULL)
+      ) po
+      WHERE a.CodCompany = @company
+        AND a.CodArticle IN (${clean.map((_, index) => `@c${index}`).join(', ')});
+    `)
+  ).recordset;
+
+  for (const row of rows) {
+    result.set(String(row.code).trim().toUpperCase(), {
+      description: String(row.description || '').trim(),
+      unit: row.unit ? String(row.unit).trim() : '',
+      blockedManufacturing: Boolean(row.blockedManufacturing),
+      physical: Number(row.physical) || 0,
+      reserved: Number(row.reserved) || 0,
+      pendingPurchases: Number(row.pendingPurchases) || 0,
+      // Fecha de RPS sin zona: se toma tal cual (AAAA-MM-DD) para no correr el día
+      nextReceipt: row.nextReceipt instanceof Date ? row.nextReceipt.toISOString().slice(0, 10) : null
+    });
+  }
+  return result;
+}
+
+// Ruta en RPS de un documento, solo si es del propio artículo o de su genérico (así no se puede
+// pedir cualquier documento de RPS cambiando el id).
+export async function getArticleDocumentPath(idArticle, idEntityDocument) {
+  const pool = await getPool();
+  const request = pool.request();
+  request.input('company', sql.VarChar(10), config.db.company);
+  request.input('idArticle', sql.VarChar(80), idArticle);
+  request.input('idDocument', sql.VarChar(80), idEntityDocument);
+  const result = await request.query(`
+    SELECT TOP 1 ed.Description AS name, COALESCE(NULLIF(ed.Path, ''), d.Path) AS rpsPath, d.DocFileName AS fileName
+    FROM dbo.STKArticle a
+    JOIN dbo.GENEntityDocument ed
+      ON ed.EntityID IN (a.IDArticle, a.IDArticleGeneric)
+      AND ed.CodCompany = a.CodCompany
+      AND ed.EntityType = 'Article'
+    LEFT JOIN dbo.GENDocument d
+      ON d.IDDocument = ed.IDDocument
+      AND d.CodCompany = ed.CodCompany
+    WHERE a.CodCompany = @company
+      AND a.IDArticle = @idArticle
+      AND ed.IDEntityDocument = @idDocument;
+  `);
+  return result.recordset[0] || null;
+}
+
+// Artículos activos con algún dato de ancho (unidad ML…, código …P120 o «AN» en la descripción),
+// para la lista de anchos que no cuadran (widthReport.js).
+export async function listWidthCandidates() {
+  const pool = await getPool();
+  const request = pool.request();
+  request.input('company', sql.VarChar(10), config.db.company);
+  request.timeout = 60000;
+  const result = await request.query(`
+    SELECT
+      a.CodArticle AS code,
+      a.Description AS description,
+      mu.CodMeasureUnit AS unitCode,
+      mu.Description AS unitDescription,
+      pf.Description AS family
+    FROM dbo.STKArticle a
+    LEFT JOIN dbo.GENMeasureUnit mu
+      ON mu.IDMeasureUnit = a.IDUnitQuantityWarehouse
+      AND mu.CodCompany = a.CodCompany
+    LEFT JOIN dbo.GENProductFamily pf
+      ON pf.IDProductFamily = a.IDProductFamily
+      AND pf.CodCompany = a.CodCompany
+    WHERE a.CodCompany = @company
+      AND (a.InactiveDate IS NULL OR a.InactiveDate > GETDATE())
+      AND (mu.CodMeasureUnit LIKE 'ML%' OR a.Description LIKE '%AN%' OR a.CodArticle LIKE '%P[0-9][0-9]%');
+  `);
+  return result.recordset;
+}
+
 // Igualdad exacta, también para materiales antiguos o fuera del catálogo habitual.
 export async function findArticleByCode(code) {
   const pool = await getPool();
@@ -109,6 +245,11 @@ function getPool() {
       },
       requestTimeout: 15000,
       connectionTimeout: 10000
+    });
+    // Si la conexión falla (RPS reiniciándose, red caída), no se guarda el fallo: la siguiente
+    // consulta lo vuelve a intentar. Antes, un fallo al arrancar dejaba la web sin RPS hasta reiniciarla.
+    poolPromise.catch(() => {
+      poolPromise = undefined;
     });
   }
 

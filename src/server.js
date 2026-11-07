@@ -1,7 +1,7 @@
 import compression from 'compression';
 import express from 'express';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { createReadStream, readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +13,9 @@ import {
   getArticleStockDetails,
   getArticleSheet,
   findArticleByCode,
+  getStockForCodes,
+  getArticleDocumentPath,
+  listWidthCandidates,
   getOfOwners,
   getOrderConsumption,
   getOrderOfs,
@@ -27,6 +30,9 @@ import { deleteDraft, getDraftById, listDrafts, saveDraft } from './drafts.js';
 import { appendAudit, listAudit, listKnownUsers, userFromRequest } from './audit.js';
 import { httpError } from './httpError.js';
 import { findOfMismatches, orderKey } from './orders.js';
+import { checkStock, describeStockWarnings, requestedByCode } from './stockCheck.js';
+import { documentContentType, resolveRpsDocumentPath } from './rpsDocuments.js';
+import { toCsv, widthConflicts } from './widthReport.js';
 import { normalizeReservation } from './validation.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,10 +49,11 @@ app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', async (_req, res, next) => {
   try {
-    const [database, exportPath, orderArchivePath] = await Promise.all([
+    const [database, exportPath, orderArchivePath, rpsDocumentsPath] = await Promise.all([
       checkDatabase().catch(() => false),
       getPathStatus(config.exportDirectory),
-      getPathStatus(config.orderArchiveRoot)
+      getPathStatus(config.orderArchiveRoot),
+      getPathStatus(config.rpsShareRoot)
     ]);
 
     res.json({
@@ -55,9 +62,12 @@ app.get('/api/health', async (_req, res, next) => {
       database,
       networkSave: exportPath.configured && exportPath.valid && exportPath.accessible !== false,
       orderArchive: orderArchivePath.configured && orderArchivePath.valid && orderArchivePath.accessible !== false,
+      // Documentos de RPS (fichas técnicas): ¿se pueden abrir desde la ficha de artículo?
+      rpsDocuments: rpsDocumentsPath.configured && rpsDocumentsPath.valid && rpsDocumentsPath.accessible === true,
       paths: {
         exportDirectory: exportPath,
-        orderArchiveRoot: orderArchivePath
+        orderArchiveRoot: orderArchivePath,
+        rpsShareRoot: rpsDocumentsPath
       }
     });
   } catch (error) {
@@ -294,6 +304,79 @@ app.get('/api/article-image/:code', async (req, res, next) => {
   }
 });
 
+// Abrir un documento de la ficha de artículo (rpsDocuments.js). Respuesta en texto llano si falla,
+// porque se abre en una pestaña nueva del navegador.
+app.get('/api/article-document', async (req, res) => {
+  const idArticle = String(req.query.idArticle || '').trim();
+  const id = String(req.query.id || '').trim();
+  const fail = (status, message) => res.status(status).type('text/plain; charset=utf-8').send(message);
+  if (!idArticle || !id || idArticle.length > 80 || id.length > 80) return fail(400, 'Falta el documento.');
+  if (!config.rpsShareRoot) {
+    return fail(503, 'Este servidor todavía no tiene acceso a la carpeta de documentos de RPS. Pide a IT que la monte y configure RPS_SHARE_ROOT.');
+  }
+
+  try {
+    const document = await getArticleDocumentPath(idArticle, id);
+    if (!document) return fail(404, 'No se encontró ese documento en la ficha del artículo.');
+    const filePath = resolveRpsDocumentPath(document.rpsPath, {
+      shareUnc: config.rpsShareUnc,
+      shareRoot: config.rpsShareRoot
+    });
+    if (!filePath) return fail(404, `El documento está fuera de la carpeta de RPS y no se puede abrir desde aquí: ${document.rpsPath}`);
+    const stat = await withTimeout(fs.stat(filePath), 8000).catch(() => null);
+    if (!stat?.isFile()) return fail(404, `No se encuentra el archivo en la carpeta de RPS: ${document.rpsPath}`);
+
+    const { contentType, inline } = documentContentType(filePath);
+    const fileName = path.basename(filePath);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+    res.setHeader('Cache-Control', 'private, max-age=600');
+    createReadStream(filePath)
+      .on('error', () => (res.headersSent ? res.destroy() : fail(500, 'No se pudo leer el documento.')))
+      .pipe(res);
+  } catch (error) {
+    console.error('No se pudo abrir el documento de RPS:', error.message);
+    fail(500, 'No se pudo abrir el documento de RPS.');
+  }
+});
+
+// Lista de anchos que no cuadran en las fichas de RPS, para corregirlas allí (widthReport.js).
+app.get('/api/reports/width-conflicts.csv', async (_req, res, next) => {
+  try {
+    const conflicts = widthConflicts(await listWidthCandidates());
+    const today = new Date().toISOString().slice(0, 10);
+    res
+      .setHeader('Content-Type', 'text/csv; charset=utf-8')
+      .setHeader('Content-Disposition', `attachment; filename="anchos-dudosos-${today}.csv"`)
+      .send(toCsv(conflicts));
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Stock libre y bloqueos de lo que lleva la asignación (stockCheck.js). Solo lectura en RPS.
+app.post('/api/stock-check', async (req, res, next) => {
+  try {
+    const ofs = Array.isArray(req.body?.ofs) ? req.body.ofs : [];
+    const requested = requestedByCode(ofs);
+    const codes = [
+      ...new Set(
+        ofs.flatMap((ofBlock) => (Array.isArray(ofBlock?.materials) ? ofBlock.materials : []).map((line) => String(line?.code || '').trim().toUpperCase()))
+      )
+    ].filter(Boolean);
+    const stock = await getStockForCodes(codes);
+    const result = checkStock(requested, stock);
+    res.json({
+      stock: Object.fromEntries(stock),
+      ...result,
+      messages: describeStockWarnings(result)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/article-by-code', async (req, res) => {
   const code = String(req.query.code || '').trim();
   if (!code || code.length > 120) return res.status(400).json({ error: 'Falta un código de artículo válido.' });
@@ -508,6 +591,11 @@ app.use((error, _req, res, _next) => {
 
 const server = app.listen(config.port, () => {
   console.log(`Reserva de materiales disponible en http://localhost:${config.port}`);
+  // Se abre ya la conexión con RPS: si no, la primera consulta del día tarda ~2 s en abrirla.
+  // Si RPS no responde, no pasa nada: el pool lo vuelve a intentar en la siguiente consulta.
+  checkDatabase()
+    .then(() => console.log('Conexión con RPS abierta.'))
+    .catch((error) => console.warn('RPS no responde todavía:', error.message));
 });
 
 server.on('error', (error) => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Loader2, MapPin, PackagePlus, RotateCcw, Search } from 'lucide-react';
+import { AlertTriangle, Loader2, MapPin, PackagePlus, RotateCcw, Ruler, Search } from 'lucide-react';
 import { ArticleThumb } from '../common/ArticleThumb';
 import type { Article, ArticleFilters, CatalogFilterState, OfBlock } from '../../types';
 import { formatDisplayText, formatNumber, formatUnitLabel } from '../../utils';
@@ -183,6 +183,15 @@ export function ArticleCatalog({
                 Limpiar filtros
               </button>
             )}
+            <a
+              className="button button-muted button-sm"
+              href="/api/reports/width-conflicts.csv"
+              download
+              title="Descarga (para Excel) los artículos cuyo ancho no cuadra entre la ficha de RPS, el código y la descripción, para corregirlos en RPS"
+            >
+              <Ruler aria-hidden="true" />
+              Anchos dudosos
+            </a>
           </div>
         </div>
       </div>

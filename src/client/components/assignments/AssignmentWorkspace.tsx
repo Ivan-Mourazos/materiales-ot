@@ -2,6 +2,7 @@ import { ChevronsDownUp, ChevronsUpDown, FileClock, Save, X } from 'lucide-react
 import type { Article, OfBlock } from '../../types';
 import type { Quantity, QuantityInput } from '../../quantities';
 import { OfCard } from './OfCard';
+import { StockCheckContext, useStockCheck } from '../../stockContext';
 import type { DropPosition } from '../../reorder';
 import { SummaryPanel } from './SummaryPanel';
 
@@ -72,7 +73,11 @@ export function AssignmentWorkspace({
   onToggleCollapsed: (ofId: string) => void;
   onSetAllCollapsed: (collapsed: boolean) => void;
 }) {
+  const stockCheck = useStockCheck(ofs);
+
   return (
+    // Stock libre y bloqueos de lo que lleva la asignación, para los avisos de cada línea
+    <StockCheckContext.Provider value={stockCheck}>
     <section className="workspace view" key="assignments">
       <SummaryPanel
         orderCode={orderCode}
@@ -170,5 +175,6 @@ export function AssignmentWorkspace({
         ))}
       </section>
     </section>
+    </StockCheckContext.Provider>
   );
 }

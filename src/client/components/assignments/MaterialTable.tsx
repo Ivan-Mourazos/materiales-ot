@@ -7,6 +7,7 @@ import { ArticleSheetByCode } from '../catalog/ArticleSheetModal';
 import type { OfBlock } from '../../types';
 import { formatDisplayText } from '../../utils';
 import { hasQuantity, parseQuantityInput, quantityInputValue, type Quantity } from '../../quantities';
+import { useStockCheckContext } from '../../stockContext';
 
 export function MaterialTable({
   ofBlock,
@@ -108,7 +109,10 @@ export function MaterialTable({
                     <strong>{line.code}</strong>
                   </span>
                 </td>
-                <td>{formatDisplayText(line.description)}</td>
+                <td>
+                  {formatDisplayText(line.description)}
+                  <StockBadges code={line.code} />
+                </td>
                 <td>
                   <span className={line.widthWarning ? 'width-warning' : ''}>
                     {line.width ? `${line.width} cm` : '-'}
@@ -197,5 +201,39 @@ export function QuantityCell({
       step="0.01"
       aria-label={`Cantidad de ${line.code}`}
     />
+  );
+}
+
+const formatAmount = (value: number) => String(Math.round(value * 1000) / 1000).replace('.', ',');
+
+/**
+ * Avisos de la línea según RPS: bloqueado para fabricación, o que no hay bastante libre para lo que
+ * pide la asignación (sumando todas las OFs con ese artículo). No impiden nada: al generar se
+ * vuelve a avisar y se puede seguir igualmente.
+ */
+function StockBadges({ code }: { code: string }) {
+  const check = useStockCheckContext();
+  if (!check) return null;
+  const key = code.trim().toUpperCase();
+  const info = check.stock[key];
+  const shortage = check.shortages.find((item) => item.code === key);
+  if (!info?.blockedManufacturing && !shortage) return null;
+  return (
+    <span className="line-badges">
+      {info?.blockedManufacturing && (
+        <span className="line-badge danger" title="Bloqueado para fabricación en la ficha de RPS. Revisa si se puede usar en una OF.">
+          No se fabrica
+        </span>
+      )}
+      {shortage && (
+        <span
+          className="line-badge warn"
+          title={`La asignación pide ${formatAmount(shortage.requested)} ${shortage.unit} en total y hay ${formatAmount(shortage.free)} libres (stock menos lo reservado en OFs).${shortage.nextReceipt ? ` Compra pendiente: llega el ${shortage.nextReceipt.split('-').reverse().join('/')}.` : shortage.pendingPurchases ? ' Hay compra pendiente.' : ''}`}
+        >
+          Faltan {formatAmount(shortage.missing)} {shortage.unit}
+          {shortage.pendingPurchases > 0 && ' · en camino'}
+        </span>
+      )}
+    </span>
   );
 }

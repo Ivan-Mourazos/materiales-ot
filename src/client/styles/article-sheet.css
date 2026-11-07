@@ -83,3 +83,15 @@ html[data-estilo='hero'][data-theme='dark'] .article-sheet-dialog .sheet-tabs > 
   .sheet-metric > strong { font-size: 20px; }
   .sheet-variant { gap: 10px; flex-direction: column; }
 }
+
+/* Documentos: el nombre y, a la derecha, «Abrir» */
+.sheet-doc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sheet-doc-head .button svg {
+  width: 14px;
+  height: 14px;
+}
