@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, Check, Copy, X, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Check, Copy, X, ExternalLink, ZoomIn } from 'lucide-react';
 import type { Article } from '../../types';
 import type { ArticleSheet, SheetArticle, Usage, Variants } from '../../articleSheetTypes';
 import { ArticleThumb } from '../common/ArticleThumb';
+import { PhotoZoom } from '../common/PhotoZoom';
 import { ModelDialog } from '../common/ModelDialog';
 
 /** Las líneas guardadas solo conservan el código; RPS resuelve el identificador real. */
@@ -67,6 +68,7 @@ function SheetContent({ article, titleId, onClose, onSelect, onBack }: { article
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [tab, setTab] = useState('summary');
+  const [zoom, setZoom] = useState(false);
   const panelId = useId();
   const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -83,7 +85,15 @@ function SheetContent({ article, titleId, onClose, onSelect, onBack }: { article
   const tabs = [['summary', 'Resumen y stock'], ['variants', 'Variantes'], ['purchases', 'Compras'], ['usage', 'Uso'], ['documents', `Documentos${sheet ? ` (${sheet.documents.length})` : ''}`]];
   return <>
     <header className="sheet-header">
-      <ArticleThumb key={article.code} code={article.code} hasImage={a?.hasImage ?? article.hasImage} size="lg" />
+      {(a?.hasImage ?? article.hasImage) ? (
+        <button className="sheet-photo-button" type="button" onClick={() => setZoom(true)} title="Ver la foto en grande" aria-label={`Ver en grande la foto de ${article.code}`}>
+          <ArticleThumb key={article.code} code={article.code} hasImage size="lg" />
+          <ZoomIn className="sheet-photo-zoom-icon" aria-hidden="true" />
+        </button>
+      ) : (
+        <ArticleThumb key={article.code} code={article.code} hasImage={a?.hasImage ?? article.hasImage} size="lg" />
+      )}
+      {zoom && <PhotoZoom code={a?.code || article.code} description={a?.description || article.description} onClose={() => setZoom(false)} />}
       <div className="sheet-identity">
         <div className="sheet-code">{onBack && <button className="icon-button" aria-label="Volver al artículo anterior" onClick={onBack}><ArrowLeft /></button>}<h2 id={titleId}>{a?.code || article.code}</h2><CopyButton value={a?.code || article.code} label="Copiar código" /></div>
         <p className="sheet-description">{a?.description || article.description}</p>

@@ -95,3 +95,85 @@ html[data-estilo='hero'][data-theme='dark'] .article-sheet-dialog .sheet-tabs > 
   width: 14px;
   height: 14px;
 }
+
+/* Foto de la ficha: se pulsa para verla en grande (PhotoZoom.tsx) */
+.sheet-photo-button {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: none;
+  cursor: zoom-in;
+}
+.sheet-photo-zoom-icon {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 22px;
+  height: 22px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.sheet-photo-button:hover .sheet-photo-zoom-icon,
+.sheet-photo-button:focus-visible .sheet-photo-zoom-icon {
+  opacity: 1;
+}
+.sheet-photo-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.photo-zoom {
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+.photo-zoom::backdrop {
+  background: rgba(9, 9, 11, 0.72);
+  backdrop-filter: blur(4px);
+}
+.photo-zoom figure {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  margin: 0;
+}
+.photo-zoom img {
+  display: block;
+  width: min(80vw, 720px);
+  max-height: 80vh;
+  border-radius: 16px;
+  background: #fff;
+  object-fit: contain;
+  box-shadow: 0 30px 80px -24px rgba(0, 0, 0, 0.6);
+}
+.photo-zoom figcaption {
+  display: grid;
+  gap: 2px;
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+}
+.photo-zoom figcaption span {
+  color: rgba(255, 255, 255, 0.75);
+}
+.photo-zoom-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-photo-zoom-icon {
+    transition: none;
+  }
+}
