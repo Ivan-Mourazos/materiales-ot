@@ -291,19 +291,35 @@ function ArticleRow({
             className="article-thumb-button"
             type="button"
             onClick={() => onOpenStock(article)}
-            title={article.hasImage ? 'Ver foto y stock' : 'Ver stock'}
-            aria-label={`Ver ficha de ${article.code}`}
+            title="Abrir la ficha del artículo"
+            aria-label={`Abrir la ficha de ${article.code}`}
           >
             <ArticleThumb key={article.code} code={article.code} hasImage={article.hasImage} />
           </button>
           <div>
-            <strong>{article.code}</strong>
+            {/* El código y la descripción también abren la ficha (Iván, 08/11/2026) */}
+            <button
+              className="catalog-open-sheet"
+              type="button"
+              onClick={() => onOpenStock(article)}
+              title="Abrir la ficha del artículo"
+            >
+              <strong>{article.code}</strong>
+            </button>
             {article.normaUne && <span>{formatDisplayText(article.normaUne)}</span>}
           </div>
         </div>
       </td>
       <td className="catalog-article">
-        <span>{formatDisplayText(article.description) || '-'}</span>
+        <button
+          className="catalog-open-sheet"
+          type="button"
+          onClick={() => onOpenStock(article)}
+          title="Abrir la ficha del artículo"
+          tabIndex={-1}
+        >
+          <span>{formatDisplayText(article.description) || '-'}</span>
+        </button>
         {showProductLine && <em>{formatDisplayText(article.productLine)}</em>}
       </td>
       <td className="catalog-classification">

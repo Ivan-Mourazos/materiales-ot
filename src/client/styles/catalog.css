@@ -682,3 +682,27 @@
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
+
+/* El código y la descripción abren la ficha del artículo: parecen texto, pero se pueden pulsar */
+.catalog-open-sheet {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.catalog-open-sheet:hover strong,
+.catalog-open-sheet:hover span {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.catalog-open-sheet:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
