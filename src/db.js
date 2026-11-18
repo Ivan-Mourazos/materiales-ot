@@ -291,6 +291,27 @@ function getSearchableText() {
   `;
 }
 
+// Número de serie (paño): el artículo aparece si alguna de sus series con stock
+// contiene el texto buscado. Mínimo 3 caracteres para no traer medio catálogo.
+function buildSeriesCondition() {
+  return `(
+    LEN(@q) >= 3
+    AND EXISTS (
+      SELECT 1
+      FROM dbo.STKStock ss
+      JOIN dbo.GENWarehouse sw
+        ON sw.IDWarehouse = ss.IDWarehouse
+        AND sw.CodCompany = ss.CodCompany
+      WHERE ss.CodCompany = a.CodCompany
+        AND ss.IDArticle = a.IDArticle
+        AND ss.Stock <> 0
+        AND sw.ClosedDate IS NULL
+        AND (sw.InactiveDate IS NULL OR sw.InactiveDate > GETDATE())
+        AND ss.Series COLLATE Latin1_General_CI_AI LIKE @like ESCAPE '\\'
+    )
+  )`;
+}
+
 function addTokenInputs(request, tokens) {
   tokens.forEach((token, index) => {
     request.input(`token${index}`, sql.VarChar(80), `%${escapeLike(token)}%`);
@@ -798,6 +819,7 @@ async function searchArticlesUncached({ query = '', limit = 25 }) {
         OR (
           ${tokenConditions}
         )
+        OR ${buildSeriesCondition()}
       )
     ORDER BY
       CASE
@@ -917,6 +939,7 @@ async function listArticlesUncached({
         OR a.Description COLLATE Latin1_General_CI_AI LIKE @like ESCAPE '\\'
         OR c.SeccionDeProduccion COLLATE Latin1_General_CI_AI LIKE @like ESCAPE '\\'
         OR ${tokenConditions}
+        OR ${buildSeriesCondition()}
       )
     ORDER BY
       CASE WHEN a.InactiveDate IS NULL OR a.InactiveDate > GETDATE() THEN 0 ELSE 1 END,

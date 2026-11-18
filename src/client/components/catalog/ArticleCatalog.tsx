@@ -104,7 +104,7 @@ export function ArticleCatalog({
               <input
                 value={filters.q}
                 onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
-                placeholder="Código, descripción o norma UNE..."
+                placeholder="Código, descripción, norma UNE o nº de serie..."
                 autoComplete="off"
               />
               {isLoading && <Loader2 className="spin" aria-hidden="true" />}
