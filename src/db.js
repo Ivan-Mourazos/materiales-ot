@@ -7,6 +7,11 @@ import { mapArticleSheet, mapArticleVariants, mapArticleUsage } from './articleS
 import { openingSql, variantsSql, usageSql } from './articleSheetSql.js';
 import { buildSuggestions, SUGGESTION_OPTIONS } from './suggestions.js';
 import { suggestionsSql } from './suggestionsSql.js';
+import { medirConsultas } from './medir-consultas.js';
+
+// Cada consulta a RPS queda apuntada con su tiempo en .logs/consultas-sql
+// (petición de IT, 20/11/2026). El informe está en coordina-ot: `pnpm consultas-sql`.
+medirConsultas({ web: 'MaterialesOT', dir: '.logs/consultas-sql' });
 
 // Un viaje por sección; la necesidad de OF nunca forma parte de la apertura.
 export async function getArticleSheet(idArticle, section = 'opening', options = {}) {
@@ -238,7 +243,9 @@ function getPool() {
       database: config.db.database,
       options: {
         encrypt: false,
-        trustServerCertificate: true
+        trustServerCertificate: true,
+        // Así IT ve en SQL Server (program_name) qué conexiones son nuestras.
+        appName: 'MaterialesOT'
       },
       pool: {
         max: 8,
