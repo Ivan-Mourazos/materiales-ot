@@ -24,6 +24,7 @@ export function AssignmentWorkspace({
   onClearActiveDraft,
   onAddOf,
   onOpenLoadModel,
+  onOpenLoadDraft,
   onOpenSaveAsModel,
   onClearAll,
   onUpdateOf,
@@ -57,6 +58,7 @@ export function AssignmentWorkspace({
   onClearActiveDraft?: () => void;
   onAddOf: () => void;
   onOpenLoadModel: () => void;
+  onOpenLoadDraft: () => void;
   onOpenSaveAsModel: () => void;
   onClearAll: () => void;
   onUpdateOf: (id: string, of: string) => void;
@@ -92,6 +94,7 @@ export function AssignmentWorkspace({
         onOpenSaveDraft={onOpenSaveDraft}
         onAddOf={onAddOf}
         onOpenLoadModel={onOpenLoadModel}
+        onOpenLoadDraft={onOpenLoadDraft}
         onOpenSaveAsModel={onOpenSaveAsModel}
         onClearAll={onClearAll}
       />

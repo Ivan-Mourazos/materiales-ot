@@ -41,3 +41,23 @@ test('solo se llevan las OFs con algo marcado y solo sus materiales marcados, si
   assert.equal(picked[0].description, 'TELON DELANTERO');
   assert.deepEqual(picked[0].materials.map((line) => [line.code, line.quantity]), [['ACRILI', 81.6], ['TUBO', 3]]);
 });
+
+test('de un borrador: conserva el ancho de cada artículo y lleva OFs aunque no tengan número', () => {
+  const draftOfs = [
+    { id: 'a', of: '', description: 'TELON TRASERO 1 UD', materials: [
+      { id: 'm1', code: 'NS86', description: 'LONA', quantity: 13.5, width: 250, widthWarning: 'aviso' },
+      { id: 'm2', code: 'OLLAO', description: 'OLLAO', quantity: null }
+    ] }
+  ];
+  const picked = buildPickedOfs(draftOfs, allLineKeys(draftOfs), newId);
+  assert.equal(picked.length, 1);
+  assert.equal(picked[0].of, '');
+  assert.equal(picked[0].description, 'TELON TRASERO 1 UD');
+  assert.deepEqual(picked[0].materials.map((l) => [l.code, l.quantity, l.width, l.widthWarning]), [
+    ['NS86', 13.5, 250, 'aviso'],
+    ['OLLAO', null, null, null]
+  ]);
+  // Ids nuevos: el borrador de origen no comparte nada con la asignación
+  assert.notEqual(picked[0].id, 'a');
+  assert.notEqual(picked[0].materials[0].id, 'm1');
+});

@@ -1,30 +1,33 @@
 import { useMemo, useState } from 'react';
 import { ArrowRight, CheckSquare, ChevronDown, Copy, Square, X } from 'lucide-react';
-import type { HistoryEntry, OfBlock } from '../../types';
-import { allLineKeys, buildPickedOfs, lineKey, ofSelectionState, toggleOf } from '../../reusePick';
+import type { OfBlock } from '../../types';
+import { allLineKeys, buildPickedOfs, lineKey, ofSelectionState, toggleOf, type PickableOf } from '../../reusePick';
 import { formatDisplayText, formatNumber, uid } from '../../utils';
-import { ArticleThumb } from '../common/ArticleThumb';
-import { ModelDialog } from '../common/ModelDialog';
-import { TriStateCheckbox } from '../common/TriStateCheckbox';
+import { ArticleThumb } from './ArticleThumb';
+import { ModelDialog } from './ModelDialog';
+import { TriStateCheckbox } from './TriStateCheckbox';
 
 /**
- * Reutilizar una reserva del historial eligiendo qué OFs llevar y qué materiales dentro de cada
- * una (Iván, 03/11/2026: antes se llevaba todo de golpe). Las OFs llegan sin número: son de otro
- * pedido.
+ * Elegir qué OFs llevar a la asignación y qué materiales dentro de cada una. Se usa para
+ * reutilizar una reserva del historial (Iván, 03/11/2026) y para traer OFs de otro borrador
+ * (25/11/2026). Las OFs llegan sin número: Iván, «el número de la OF no hace falta».
  */
-export function ReuseHistoryModal({
-  entry,
+export function PickOfsModal({
+  title,
+  sourceOfs,
   onClose,
   onReuse
 }: {
-  entry: HistoryEntry;
+  /** Lo que sigue a «Reutilizar»: «Pedido AR…», «borrador «ODL 500EE»»… */
+  title: string;
+  sourceOfs: PickableOf[];
   onClose: () => void;
   onReuse: (ofs: OfBlock[], replaceExisting: boolean) => void;
 }) {
-  const [selected, setSelected] = useState(() => allLineKeys(entry.ofs));
-  const [openOfs, setOpenOfs] = useState<Set<number>>(() => new Set(entry.ofs.length <= 3 ? entry.ofs.map((_, i) => i) : []));
+  const [selected, setSelected] = useState(() => allLineKeys(sourceOfs));
+  const [openOfs, setOpenOfs] = useState<Set<number>>(() => new Set(sourceOfs.length <= 3 ? sourceOfs.map((_, i) => i) : []));
   const [replaceExisting, setReplaceExisting] = useState(false);
-  const picked = useMemo(() => buildPickedOfs(entry.ofs, selected, uid), [entry.ofs, selected]);
+  const picked = useMemo(() => buildPickedOfs(sourceOfs, selected, uid), [sourceOfs, selected]);
   const pickedLines = picked.reduce((sum, block) => sum + block.materials.length, 0);
 
   function toggleLine(key: string) {
@@ -45,8 +48,6 @@ export function ReuseHistoryModal({
     });
   }
 
-  const title = entry.orderCode ? `Pedido ${entry.orderCode}` : `OF ${entry.ofs.map((item) => item.of).join(', ')}`;
-
   return (
     <ModelDialog className="reuse-history-modal" labelledBy="reuse-history-title" onClose={onClose}>
       <div className="modal-header">
@@ -66,10 +67,10 @@ export function ReuseHistoryModal({
 
       <div className="transfer-parts-toolbar">
         <span className="parts-count-label">
-          {picked.length} de {entry.ofs.length} OFs · {pickedLines} líneas
+          {picked.length} de {sourceOfs.length} OFs · {pickedLines} líneas
         </span>
         <div className="quick-selection-buttons">
-          <button className="button button-ghost-sm" type="button" onClick={() => setSelected(allLineKeys(entry.ofs))}>
+          <button className="button button-ghost-sm" type="button" onClick={() => setSelected(allLineKeys(sourceOfs))}>
             <CheckSquare aria-hidden="true" /> Marcar todo
           </button>
           <button className="button button-ghost-sm" type="button" onClick={() => setSelected(new Set())}>
@@ -79,7 +80,7 @@ export function ReuseHistoryModal({
       </div>
 
       <ul className="reuse-list">
-        {entry.ofs.map((ofBlock, ofIndex) => {
+        {sourceOfs.map((ofBlock, ofIndex) => {
           const state = ofSelectionState(ofBlock, ofIndex, selected);
           const isOpen = openOfs.has(ofIndex);
           const markedCount = ofBlock.materials.filter((_, lineIndex) => selected.has(lineKey(ofIndex, lineIndex))).length;
@@ -88,11 +89,11 @@ export function ReuseHistoryModal({
               <div className="reuse-of-head">
                 <TriStateCheckbox
                   state={state}
-                  label={`Llevar la OF ${ofBlock.of}`}
+                  label={`Llevar la OF ${ofBlock.of || formatDisplayText(ofBlock.description) || ofIndex + 1}`}
                   onChange={() => setSelected((current) => toggleOf(ofBlock, ofIndex, current))}
                 />
                 <button type="button" className="reuse-of-toggle" aria-expanded={isOpen} onClick={() => toggleOpen(ofIndex)}>
-                  <span className="of-tag">OF {ofBlock.of}</span>
+                  {ofBlock.of && <span className="of-tag">OF {ofBlock.of}</span>}
                   <strong>{formatDisplayText(ofBlock.description) || 'Sin descripción'}</strong>
                   <span className="reuse-count">
                     {markedCount} de {ofBlock.materials.length} materiales

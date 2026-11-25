@@ -1,4 +1,4 @@
-import { AlertTriangle, BookmarkPlus, Check, ClipboardList, DownloadCloud, FileClock, Layers, Loader2, Plus, Save, X } from 'lucide-react';
+import { AlertTriangle, BookmarkPlus, Check, ClipboardList, DownloadCloud, FileClock, Files, Layers, Loader2, Plus, Save, X } from 'lucide-react';
 import { detectOrderYear, formatNumber } from '../../utils';
 
 export function SummaryPanel({
@@ -14,6 +14,7 @@ export function SummaryPanel({
   onOpenSaveDraft,
   onAddOf,
   onOpenLoadModel,
+  onOpenLoadDraft,
   onOpenSaveAsModel,
   onClearAll
 }: {
@@ -29,6 +30,7 @@ export function SummaryPanel({
   onOpenSaveDraft: () => void;
   onAddOf: () => void;
   onOpenLoadModel: () => void;
+  onOpenLoadDraft: () => void;
   onOpenSaveAsModel: () => void;
   onClearAll: () => void;
 }) {
@@ -121,6 +123,16 @@ export function SummaryPanel({
         <button className="button button-muted" type="button" onClick={onOpenLoadModel}>
           <Layers aria-hidden="true" />
           Usar un modelo
+        </button>
+
+        <button
+          className="button button-muted"
+          type="button"
+          onClick={onOpenLoadDraft}
+          title="Añadir OFs con sus artículos de otro borrador guardado"
+        >
+          <Files aria-hidden="true" />
+          Traer de un borrador
         </button>
 
         <button

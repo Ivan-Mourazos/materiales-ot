@@ -53,7 +53,10 @@ import { useTheme } from './hooks/useTheme';
 import { useToasts } from './hooks/useToasts';
 import { getUserName, instalarCabeceraUsuario, setUserName } from './currentUser';
 import { WhoAreYouDialog } from './components/common/WhoAreYouDialog';
-import { ReuseHistoryModal } from './components/history/ReuseHistoryModal';
+import { PickOfsModal } from './components/common/PickOfsModal';
+import { SourcePickerModal } from './components/assignments/SourcePickerModal';
+import { ModelTransferModal } from './components/models/ModelTransferModal';
+import type { PickableOf } from './reusePick';
 
 const storageKey = 'materiales-ot-state-v3';
 
@@ -103,7 +106,11 @@ function App() {
   const [ofWarningsPrompt, setOfWarningsPrompt] = useState<string[] | null>(null);
   const [isImportingOfs, setIsImportingOfs] = useState(false);
   const [isCopyConsumptionOpen, setIsCopyConsumptionOpen] = useState(false);
-  const [reuseEntry, setReuseEntry] = useState<HistoryEntry | null>(null);
+  // De dónde se eligen OFs y artículos (una reserva del historial o un borrador) y cómo se llama en el aviso
+  const [pickOfsSource, setPickOfsSource] = useState<{ title: string; origin: string; ofs: PickableOf[] } | null>(null);
+  // Elegir desde Asignación el modelo o el borrador del que traer OFs (SourcePickerModal)
+  const [sourcePicker, setSourcePicker] = useState<'model' | 'draft' | null>(null);
+  const [modelToTransfer, setModelToTransfer] = useState<AssignmentModel | null>(null);
   // OFs plegadas en Asignaciones (solo la cabecera); no se guarda, es cómo se ve ahora
   const [collapsedOfs, setCollapsedOfs] = useState<Set<string>>(() => new Set());
   // Lo ya confirmado en este intento de generar: al aceptar el siguiente aviso no se vuelve a preguntar.
@@ -275,9 +282,16 @@ function App() {
     setOfs((current) => current.map((item) => (item.id === id ? { ...item, description } : item)));
   }
 
-  // Reutilizar del historial: abre el diálogo para elegir OFs y materiales (ReuseHistoryModal)
+  // Reutilizar del historial: abre el diálogo para elegir OFs y materiales (PickOfsModal)
   function reuseReservation(entry: HistoryEntry) {
-    setReuseEntry(entry);
+    const title = entry.orderCode ? `Pedido ${entry.orderCode}` : `OF ${entry.ofs.map((item) => item.of).join(', ')}`;
+    setPickOfsSource({ title, origin: 'del historial', ofs: entry.ofs });
+  }
+
+  // Traer OFs de otro borrador: mismo diálogo que el historial; el borrador de origen no se toca
+  function reuseDraft(draft: OrderDraft) {
+    const name = draft.name || 'sin nombre';
+    setPickOfsSource({ title: `borrador «${name}»`, origin: `del borrador «${name}»`, ofs: draft.ofs });
   }
 
   function applyReusedOfs(picked: OfBlock[], replaceExisting: boolean) {
@@ -287,11 +301,12 @@ function App() {
       const rest = current.filter((ofBlock) => ofBlock.of.trim() || ofBlock.materials.length > 0);
       return [...rest, ...picked];
     });
-    setReuseEntry(null);
+    const origin = pickOfsSource?.origin || '';
+    setPickOfsSource(null);
     setActiveTab('assignments');
     const lines = picked.reduce((sum, block) => sum + block.materials.length, 0);
     pushToast(
-      `${picked.length === 1 ? '1 OF' : `${picked.length} OFs`} y ${lines} líneas cargadas del historial. Escribe las nuevas OFs y el pedido.`,
+      `${picked.length === 1 ? '1 OF' : `${picked.length} OFs`} y ${lines} líneas cargadas ${origin}. Escribe los números de OF${activeDraft ? '' : ' y el pedido'}.`,
       'info',
       { label: 'Deshacer', run: () => setOfs(previous) }
     );
@@ -883,7 +898,8 @@ function App() {
           isQuickSavingDraft={isQuickSavingDraft}
           onClearActiveDraft={clearActiveDraft}
           onAddOf={addOf}
-          onOpenLoadModel={() => setActiveTab('models')}
+          onOpenLoadModel={() => setSourcePicker('model')}
+          onOpenLoadDraft={() => setSourcePicker('draft')}
           onOpenSaveAsModel={() => setIsSaveAsModelOpen(true)}
           onClearAll={clearAll}
           onUpdateOf={updateOf}
@@ -954,8 +970,38 @@ function App() {
         />
       )}
 
-      {reuseEntry && (
-        <ReuseHistoryModal entry={reuseEntry} onClose={() => setReuseEntry(null)} onReuse={applyReusedOfs} />
+      {pickOfsSource && (
+        <PickOfsModal
+          title={pickOfsSource.title}
+          sourceOfs={pickOfsSource.ofs}
+          onClose={() => setPickOfsSource(null)}
+          onReuse={applyReusedOfs}
+        />
+      )}
+
+      {sourcePicker && (
+        <SourcePickerModal
+          kind={sourcePicker}
+          excludeId={activeDraft?.id}
+          onClose={() => setSourcePicker(null)}
+          onPick={(picked) => {
+            setSourcePicker(null);
+            if (picked.kind === 'model') setModelToTransfer(picked.record);
+            else reuseDraft(picked.record);
+          }}
+        />
+      )}
+
+      {modelToTransfer && (
+        <ModelTransferModal
+          model={modelToTransfer}
+          onClose={() => setModelToTransfer(null)}
+          onTransfer={(parts, replaceExisting) => {
+            const model = modelToTransfer;
+            setModelToTransfer(null);
+            handleTransferModelToAssignment(model, parts, replaceExisting);
+          }}
+        />
       )}
 
       {isCopyConsumptionOpen && (

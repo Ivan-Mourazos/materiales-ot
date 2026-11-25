@@ -1,10 +1,10 @@
 import type { OfBlock } from './types';
 
-/** Una OF tal como viene del historial (lo que se generó en su día). */
+/** Una OF del historial (lo que se generó en su día) o de un borrador. Los borradores traen el ancho. */
 export type PickableOf = {
   of: string;
   description?: string;
-  materials: { code: string; description: string; quantity: number | null }[];
+  materials: { code: string; description: string; quantity: number | null; width?: number | null; widthWarning?: string | null }[];
 };
 
 /** Clave de una línea dentro de la lista: posición de la OF y del material. */
@@ -38,7 +38,7 @@ export function toggleOf(ofBlock: PickableOf, ofIndex: number, selected: Set<str
 }
 
 /**
- * Las OFs elegidas, listas para la asignación: sin número de OF (es otro pedido), con su pieza y
+ * Las OFs elegidas, listas para la asignación: sin número de OF (Iván: no hace falta), con su pieza y
  * solo los materiales marcados. Una OF sin ningún material marcado no se lleva.
  */
 export function buildPickedOfs(ofs: PickableOf[], selected: Set<string>, newId: () => string): OfBlock[] {
@@ -51,8 +51,8 @@ export function buildPickedOfs(ofs: PickableOf[], selected: Set<string>, newId: 
         code: line.code,
         description: line.description || '',
         quantity: line.quantity,
-        width: null,
-        widthWarning: null
+        width: line.width ?? null,
+        widthWarning: line.widthWarning ?? null
       }));
     if (materials.length === 0) return [];
     return [{ id: newId(), of: '', description: ofBlock.description || '', materials }];
