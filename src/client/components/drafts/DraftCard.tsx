@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Copy,
   Edit2,
+  FileDown,
   Layers,
   Play,
   Trash2
@@ -11,6 +12,24 @@ import {
 import type { OrderDraft } from '../../types';
 import { authorText, formatDisplayText, formatNumber, historyDateFormat } from '../../utils';
 import { countMissingQuantities, hasQuantity, sumQuantities } from '../../quantities';
+import { printMaterialList } from '../../printMaterialList';
+
+function exportDraftPdf(draft: OrderDraft) {
+  printMaterialList({
+    title: draft.orderCode ? `${draft.name} (${draft.orderCode})` : draft.name,
+    kind: 'Borrador',
+    meta: [
+      ...(draft.notes ? [draft.notes] : []),
+      `${draft.ofs.length} ${draft.ofs.length === 1 ? 'OF' : 'OFs'}`
+    ],
+    quantityLabel: 'Cantidad',
+    groups: draft.ofs.map((block, idx) => ({
+      title: block.of ? `OF ${block.of}` : `OF #${idx + 1} (sin número)`,
+      subtitle: block.description,
+      materials: block.materials
+    }))
+  });
+}
 
 export function DraftCard({
   draft,
@@ -190,6 +209,11 @@ export function DraftCard({
               </div>
             ))
           )}
+          <div className="print-list-row">
+            <button className="button button-ghost-sm" type="button" onClick={() => exportDraftPdf(draft)}>
+              <FileDown aria-hidden="true" /> Exportar PDF
+            </button>
+          </div>
         </div>
       )}
     </article>

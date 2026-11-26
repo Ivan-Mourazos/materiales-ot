@@ -1,8 +1,26 @@
 import { useId, useState } from 'react';
-import { ChevronDown, Copy, Edit2, Layers, Play, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Edit2, FileDown, Layers, Play, Trash2 } from 'lucide-react';
 import type { AssignmentModel } from '../../types';
 import { authorText, formatDisplayText, formatNumber, historyDateFormat } from '../../utils';
 import { countMissingQuantities, hasQuantity } from '../../quantities';
+import { printMaterialList } from '../../printMaterialList';
+
+function exportModelPdf(model: AssignmentModel) {
+  printMaterialList({
+    title: model.name,
+    kind: model.category ? `Modelo · ${model.category}` : 'Modelo',
+    meta: [
+      ...(model.description ? [model.description] : []),
+      `${model.parts.length} ${model.parts.length === 1 ? 'parte' : 'partes'}`
+    ],
+    quantityLabel: 'Cantidad base',
+    groups: model.parts.map((part, idx) => ({
+      title: `OF ${idx + 1} · ${part.name}`,
+      subtitle: part.description,
+      materials: part.materials
+    }))
+  });
+}
 
 export function ModelCard({
   model,
@@ -156,6 +174,11 @@ export function ModelCard({
               </div>
             ))
           )}
+          <div className="print-list-row">
+            <button className="button button-ghost-sm" type="button" onClick={() => exportModelPdf(model)}>
+              <FileDown aria-hidden="true" /> Exportar PDF
+            </button>
+          </div>
         </div>
       )}
     </article>

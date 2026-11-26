@@ -330,6 +330,17 @@
   color: var(--ink);
 }
 
+/* "Exportar PDF" al pie del detalle de borradores y modelos: discreto a propósito. */
+.print-list-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.print-list-row .button-ghost-sm svg {
+  width: 13px;
+  height: 13px;
+}
+
 .transfer-parts-list {
   display: flex;
   flex-direction: column;
