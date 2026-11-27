@@ -137,6 +137,31 @@ Para producción conviene dejarlo en `/etc/fstab` o en una unidad `systemd` con 
 
 La app avisa en `/api/health` y bloquea el guardado si se configura una ruta UNC de Windows estando en Linux.
 
+### Documentos de RPS (pestaña «Documentos» de la ficha de artículo)
+
+RPS guarda las fichas técnicas y certificados como rutas de red (`file://\\192.168.0.128\RPS\COMPRAS\...`).
+El navegador no puede abrir esas rutas desde una web, así que el botón «Abrir» los sirve el propio servidor.
+En Windows funciona sin configurar nada; en Linux hay que montar la carpeta compartida **RPS** (es otra
+distinta de `Oftecnica`) y decir dónde está. Basta con permiso de **lectura**:
+
+En el servidor de TGM se usa la misma cuenta que ya monta `Oftecnica` (`/etc/cifs-oftecnica.cred`).
+Línea de `/etc/fstab` (`iocharset=utf8` es necesario: hay carpetas con «Ñ», como `DISEÑOS+ARTICULOS`):
+
+```fstab
+//192.168.0.128/RPS /mnt/rps-documentos cifs credentials=/etc/cifs-oftecnica.cred,iocharset=utf8,uid=0,gid=0,file_mode=0755,dir_mode=0755,soft,nounix,serverino,mapposix,actimeo=1,_netdev,nofail,ro 0 0
+```
+
+```bash
+sudo mkdir -p /mnt/rps-documentos && sudo mount /mnt/rps-documentos
+```
+
+```env
+RPS_SHARE_ROOT=/mnt/rps-documentos
+```
+
+Tras cambiar `.env`, `pm2 restart materiales-ot`. Se comprueba en `/api/health`: `"rpsDocuments": true`. Mientras no esté montada,
+la ficha no muestra «Abrir» y solo deja copiar la ruta. El servidor nunca sirve nada fuera de esa carpeta.
+
 ---
 
 ## Copias de seguridad de modelos y borradores

@@ -3,7 +3,7 @@ import path from 'node:path';
 // Documentos de RPS (fichas técnicas, certificados…): RPS guarda la ruta de red, p. ej.
 // «file://\\192.168.0.128\RPS\COMPRAS\CARACTERISTIAS\MONZA.pdf». El servidor los sirve desde donde
 // esté montada esa carpeta (RPS_SHARE_ROOT): en Windows, la propia ruta de red; en el servidor Linux
-// de producción, donde IT la monte (p. ej. /mnt/rps). Nunca se sirve nada fuera de esa carpeta.
+// de producción, donde IT la monte (p. ej. /mnt/rps-documentos). Nunca se sirve nada fuera de esa carpeta.
 
 /** Tipos de archivo que se abren en el navegador; el resto se descarga. */
 export const INLINE_TYPES = {
